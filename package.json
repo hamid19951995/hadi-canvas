@@ -1,8 +1,8 @@
 {
-  "name": "gapgpt-node-canvas",
+  "name": "hadi",
   "version": "0.1.0",
   "private": true,
-  "description": "Visual Node-based Multi-Model AI Canvas for GapGPT",
+  "description": "Hadi — Visual Node-based Multi-Model AI Canvas",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
