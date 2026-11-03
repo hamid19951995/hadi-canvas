@@ -20,7 +20,7 @@
 
 | منبع | آدرس |
 |------|------|
-| GitHub | https://github.com/hamid19951995/hadi |
+| GitHub | https://github.com/hamid19951995/hadi-canvas |
 | Figma | https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys |
 | Canva Pitch | https://canva.link/0rmc00upjb16qo8 |
 | API Docs | https://gapgpt.app/platform-v2/docs/quickstart |
@@ -30,8 +30,8 @@
 ## ۳. راه‌اندازی محلی
 
 ```bash
-git clone https://github.com/hamid19951995/hadi.git
-cd hadi
+git clone https://github.com/hamid19951995/hadi-canvas.git
+cd hadi-canvas
 npm install
 npm run dev
 ```
@@ -135,7 +135,7 @@ Authorization: Bearer <API_KEY>
 
 ## ۹. مالکیت
 
-- GitHub: `hamid19951995/hadi`
+- GitHub: `hamid19951995/hadi-canvas`
 - محصول: **Hadi**
 
 ---
