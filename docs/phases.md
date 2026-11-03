@@ -2,28 +2,33 @@
 
 ## فازهای طراحی (Figma)
 
-| فاز | عنوان | وضعیت | توضیح |
-|-----|------|-------|-------|
-| ۰۰ | Cover | ✅ | صفحه کاور |
-| ۰۱ | Desktop App Layout | ✅ | ساختار کلی اپ |
-| ۰۲ | Sample Nodes & Connections | ✅ | نودهای نمونه |
-| ۰۳ | Sidebar & Actions | ✅ | سایدبار و اکشن‌ها |
-| ۰۴ | Properties Panel | ✅ | پنل ویژگی‌ها |
-| ۰۵ | Components & Design System | ✅ | سیستم طراحی |
-| ۰۶ | Connectors & Data Flow | ✅ | کانکتورها |
-| ۰۷ | Node States | ✅ | حالت‌های نود |
-| ۰۸ | Empty State + Onboarding | 🔄 | در حال انجام |
-| ۰۹ | Tablet / Responsive | ⏳ | |
-| ۱۰ | Advanced Nodes | ⏳ | شرطی، حلقه، حافظه |
-| ۱۱ | Design Tokens | ⏳ | |
-| ۱۲ | Interactive Prototype | ⏳ | |
-| ۱۳ | Handoff Documentation | ⏳ | |
+| فاز | عنوان | وضعیت |
+|-----|------|-------|
+| ۰۰–۰۸ | Cover تا Empty State & Onboarding | ✅ |
+| ۰۹ | Tablet & Responsive | ✅ |
+| **۱۰** | Advanced Nodes | ✅ |
+| ۱۱ | Design Tokens | ⏳ |
+| ۱۲ | Interactive Prototype | ⏳ |
+| ۱۳ | Handoff | ⏳ |
 
-## فازهای توسعه (کد)
+## نودهای پیاده‌شده در کد
 
-- راه‌اندازی پروژه React + React Flow
-- پیاده‌سازی نودهای پایه
-- موتور اجرای گراف
-- اتصال به APIهای GapGPT
-- سیستم ذخیره پروژه
-- Realtime و اجرای موازی
+| نوع | کامپوننت | رنگ |
+|-----|----------|-----|
+| متن | TextNode | آبی |
+| تصویر | ImageNode | بنفش |
+| ویدیو | VideoNode | صورتی |
+| ادغام | MergeNode | کهربایی |
+| شرطی | ConditionalNode | نارنجی |
+| حلقه | LoopNode | فیروزه‌ای |
+| حافظه | MemoryNode | ایندیگو |
+| فایل | FileNode | زمردی |
+
+## فازهای توسعه
+
+- ✅ راه‌اندازی React + XYFlow + Zustand
+- ✅ نودهای پایه و پیشرفته
+- ✅ اتصال به GapGPT API
+- ⏳ موتور اجرای گراف (DAG + موازی)
+- ⏳ Properties Panel
+- ⏳ ذخیره/بارگذاری پروژه
