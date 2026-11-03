@@ -16,7 +16,7 @@ import { LoopNode } from './nodes/LoopNode'
 import { MemoryNode } from './nodes/MemoryNode'
 import { FileNode } from './nodes/FileNode'
 import { useCanvasStore } from './store/useCanvasStore'
-import { runTextNode } from './services/gapgpt'
+import { executeGraph, GraphCycleError } from './engine/graphEngine'
 
 const nodeTypes: NodeTypes = {
   text: TextNode,
@@ -50,39 +50,41 @@ export default function App() {
     setSelectedNodeId,
     apiKey,
     setApiKey,
-    setNodeStatus,
     updateNodeData,
     addNode,
     isRunning,
     setIsRunning,
   } = useCanvasStore()
 
-  const runSelectedGraph = useCallback(async () => {
+  const runGraph = useCallback(async () => {
     if (!apiKey) {
       alert('لطفاً کلید API گپ‌جی‌پی‌تی را وارد کنید')
       return
     }
-    setIsRunning(true)
+    if (!nodes.length) {
+      alert('نودی برای اجرا وجود ندارد')
+      return
+    }
 
+    setIsRunning(true)
     try {
-      for (const node of nodes) {
-        if (node.type === 'text') {
-          const data = node.data as any
-          const prompt = data.prompt || 'سلام! یک جمله کوتاه بنویس.'
-          setNodeStatus(node.id, 'running')
-          try {
-            const result = await runTextNode(apiKey, data.model || 'gpt-4o', prompt)
-            setNodeStatus(node.id, 'success', { result })
-            updateNodeData(node.id, { result })
-          } catch (err: any) {
-            setNodeStatus(node.id, 'error', { error: err.message })
-          }
-        }
+      await executeGraph(nodes, edges, {
+        apiKey,
+        results: new Map(),
+        onNodeUpdate: (id, patch) => {
+          updateNodeData(id, patch as any)
+        },
+      })
+    } catch (err) {
+      if (err instanceof GraphCycleError) {
+        alert(err.message)
+      } else {
+        alert(err instanceof Error ? err.message : 'خطا در اجرای گراف')
       }
     } finally {
       setIsRunning(false)
     }
-  }, [apiKey, nodes, setIsRunning, setNodeStatus, updateNodeData])
+  }, [apiKey, nodes, edges, setIsRunning, updateNodeData])
 
   const randomPos = () => ({
     x: 80 + Math.random() * 400,
@@ -93,6 +95,7 @@ export default function App() {
     <div className="w-screen h-screen bg-[#111827] flex flex-col">
       <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
         <span className="text-white font-semibold text-lg shrink-0">GapGPT Canvas</span>
+        <span className="text-slate-500 text-xs shrink-0 hidden md:inline">موتور گراف v14</span>
 
         <div className="flex-1" />
 
@@ -116,11 +119,11 @@ export default function App() {
         </div>
 
         <button
-          onClick={runSelectedGraph}
+          onClick={runGraph}
           disabled={isRunning}
           className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded-lg font-medium shrink-0"
         >
-          {isRunning ? '...' : '▶ اجرا'}
+          {isRunning ? 'در حال اجرا...' : '▶ اجرای گراف'}
         </button>
       </div>
 
