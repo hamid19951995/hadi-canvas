@@ -1,6 +1,6 @@
 # فازهای پروژه GapGPT Node Canvas
 
-## فازهای طراحی و تحویل — همه کامل ✅
+## فازهای طراحی و تحویل
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
@@ -9,27 +9,29 @@
 | ۱۰ | Advanced Nodes | ✅ |
 | ۱۱ | Design Tokens | ✅ |
 | ۱۲ | Interactive Prototype | ✅ |
-| **۱۳** | Handoff | ✅ |
+| ۱۳ | Handoff | ✅ |
 
-جزئیات تحویل: [handoff.md](./handoff.md)
+## فازهای توسعه
+
+| فاز | عنوان | وضعیت |
+|-----|------|-------|
+| **۱۴** | موتور اجرای گراف (DAG + موازی) | ✅ |
+| ۱۵ | Properties Panel | ⏳ |
+| ۱۶ | ذخیره/بارگذاری پروژه | ⏳ |
+| ۱۷ | بک‌اند محافظ API key | ⏳ |
+
+جزئیات موتور: [graph-engine.md](./graph-engine.md)  
+Handoff: [handoff.md](./handoff.md)
 
 ## نودهای پیاده‌شده
 
-| نوع | کامپوننت | رنگ |
-|-----|----------|-----|
-| متن | TextNode | آبی |
-| تصویر | ImageNode | بنفش |
-| ویدیو | VideoNode | صورتی |
-| ادغام | MergeNode | کهربایی |
-| شرطی | ConditionalNode | نارنجی |
-| حلقه | LoopNode | فیروزه‌ای |
-| حافظه | MemoryNode | ایندیگو |
-| فایل | FileNode | زمردی |
-
-## backlog پیشنهادی بعد از Handoff
-
-- موتور اجرای گراف (DAG + موازی)
-- Properties Panel
-- بک‌اند برای محافظت از API key
-- منطق واقعی Conditional / Loop / Memory / File
-- ذخیره و بارگذاری پروژه
+| نوع | کامپوننت | اجرا در موتور |
+|-----|----------|----------------|
+| متن | TextNode | GapGPT API |
+| تصویر | ImageNode | placeholder |
+| ویدیو | VideoNode | placeholder |
+| ادغام | MergeNode | الحاق ورودی‌ها |
+| شرطی | ConditionalNode | TRUE/FALSE |
+| حلقه | LoopNode | تکرار محلی |
+| حافظه | MemoryNode | ذخیره context |
+| فایل | FileNode | خروجی نام‌دار |
