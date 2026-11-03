@@ -7,7 +7,7 @@ import {
   downloadProjectJson,
   type CanvasProject,
 } from '../services/projectStorage'
-import { runTextNode } from '../services/gapgpt'
+import { runTextNode, chatCompletion, type ChatMessage } from '../services/gapgpt'
 
 export type NodeStatus = 'empty' | 'running' | 'success' | 'error'
 
@@ -16,6 +16,8 @@ export interface CanvasNodeData {
   model?: string
   prompt?: string
   models?: string[]
+  chatModel?: string
+  chatMessages?: ChatMessage[]
   status: NodeStatus
   result?: string
   error?: string
@@ -51,12 +53,26 @@ interface CanvasState {
   loadProject: (project: CanvasProject) => void
   loadFromStorage: () => boolean
   runParallelBuild: (promptNodeId: string) => Promise<void>
+  sendNodeChat: (nodeId: string, userText: string, agentMode: boolean) => Promise<void>
+  applyChatSuggestion: (nodeId: string) => Promise<void>
 }
 
 const APP_SYSTEM = `تو یک مهندس فرانت‌اند هستی. فقط یک فایل HTML کامل و قابل اجرا تولید کن (با CSS و JS درون‌خطی).
 زبان رابط: فارسی و dir=rtl مگر خلافش خواسته شود.
 خروجی را داخل بلوک markdown با برچسب html بگذار.
 هیچ توضیح اضافه‌ای بیرون از بلوک کد ننویس.`
+
+const CHAT_SYSTEM = `تو دستیار hadi-canvas هستی. کوتاه و مفید پاسخ بده. روی ایده کاربر برای ساخت اپ/محتوا تمرکز کن.`
+
+const AGENT_SYSTEM = `تو ایجنت hadi-canvas هستی.
+با کاربر درباره ایده صحبت کن و پیشنهاد عملی بده.
+وقتی پیشنهاد نهایی برای «پرامپت ساخت» آماده شد، آن را داخل بلوک زیر بگذار:
+
+\`\`\`prompt
+متن پرامپت نهایی اینجا
+\`\`\`
+
+اگر کاربر گفت «اعمال کن» فقط همان پرامپت نهایی را داخل بلوک prompt بگذار و توضیح اضافه نده.`
 
 const defaultNodes: Node[] = [
   {
@@ -67,6 +83,7 @@ const defaultNodes: Node[] = [
       label: 'پرامپت اصلی',
       prompt: 'یک ماشین حساب ساده با ظاهر مدرن بساز',
       models: ['gpt-4o', 'gpt-4o-mini'],
+      chatMessages: [],
       status: 'empty',
     },
   },
@@ -106,13 +123,25 @@ function readApiKey() {
   )
 }
 
+function extractPromptBlock(text: string): string | null {
+  const m = text.match(/```prompt\s*([\s\S]*?)```/i)
+  if (m?.[1]) return m[1].trim()
+  const m2 = text.match(/```(?:text)?\s*([\s\S]*?)```/)
+  if (m2?.[1] && m2[1].trim().length > 10) return m2[1].trim()
+  return null
+}
+
+function isApplyCommand(text: string) {
+  return /اعمال\s*کن|اعمال\s*شود|apply/i.test(text.trim())
+}
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: defaultNodes,
   edges: defaultEdges,
   selectedNodeId: null,
   apiKey: readApiKey(),
   isRunning: false,
-  projectName: 'Hadi',
+  projectName: 'hadi-canvas',
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -163,7 +192,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (type === 'text' || type === 'prompt') {
       baseData.model = 'gpt-4o'
       baseData.prompt = ''
-      if (type === 'prompt') baseData.models = ['gpt-4o']
+      if (type === 'prompt') {
+        baseData.models = ['gpt-4o']
+        baseData.chatMessages = []
+      }
     }
     if (type === 'conditional') baseData.condition = 'شامل «بله» باشد'
     if (type === 'loop') baseData.iterations = 3
@@ -176,7 +208,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   saveProject: (download = false) => {
     const { nodes, edges, projectName } = get()
-    const project = createProject(nodes, edges, projectName || 'Hadi')
+    const project = createProject(nodes, edges, projectName || 'hadi-canvas')
     saveToLocalStorage(project)
     if (download) downloadProjectJson(project)
   },
@@ -186,7 +218,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       nodes: project.nodes,
       edges: project.edges,
-      projectName: project.name || 'Hadi',
+      projectName: project.name || 'hadi-canvas',
       selectedNodeId: null,
     })
     saveToLocalStorage(project)
@@ -199,13 +231,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     return true
   },
 
-  /**
-   * Real multi-model build (like the گراف prototype, but live API):
-   * 1) read prompt + selected models from PromptNode
-   * 2) create a text node + appOutput node per model
-   * 3) call API in parallel
-   * 4) put real HTML/text into output nodes
-   */
   runParallelBuild: async (promptNodeId) => {
     const state = get()
     const promptNode = state.nodes.find((n) => n.id === promptNodeId)
@@ -285,5 +310,106 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     get().updateNodeData(promptNodeId, { status: 'success' })
     set({ isRunning: false })
+  },
+
+  sendNodeChat: async (nodeId, userText, agentMode) => {
+    const node = get().nodes.find((n) => n.id === nodeId)
+    if (!node) return
+    const d = node.data as CanvasNodeData
+    const prev = (d.chatMessages || []) as ChatMessage[]
+    const model = d.chatModel || d.model || 'gpt-4o'
+
+    // If user says apply, run apply path
+    if (isApplyCommand(userText)) {
+      const withUser = [...prev, { role: 'user' as const, content: userText }]
+      get().updateNodeData(nodeId, { chatMessages: withUser })
+      await get().applyChatSuggestion(nodeId)
+      return
+    }
+
+    const nextMessages: ChatMessage[] = [
+      ...prev,
+      { role: 'user', content: userText },
+    ]
+    get().updateNodeData(nodeId, { chatMessages: nextMessages })
+
+    try {
+      const system = agentMode ? AGENT_SYSTEM : CHAT_SYSTEM
+      const apiMessages: ChatMessage[] = [
+        { role: 'system', content: system },
+        ...nextMessages,
+      ]
+      const res = await chatCompletion(get().apiKey, {
+        model,
+        messages: apiMessages,
+        temperature: agentMode ? 0.5 : 0.7,
+      })
+      const reply = res.choices?.[0]?.message?.content || 'پاسخی دریافت نشد.'
+      get().updateNodeData(nodeId, {
+        chatMessages: [...nextMessages, { role: 'assistant', content: reply }],
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      get().updateNodeData(nodeId, {
+        chatMessages: [
+          ...nextMessages,
+          { role: 'assistant', content: `خطا: ${message}` },
+        ],
+      })
+    }
+  },
+
+  applyChatSuggestion: async (nodeId) => {
+    const node = get().nodes.find((n) => n.id === nodeId)
+    if (!node) return
+    const d = node.data as CanvasNodeData
+    const msgs = (d.chatMessages || []) as ChatMessage[]
+    const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant')
+    if (!lastAssistant) {
+      alert('پیشنهادی از مدل نیست. اول چت کنید.')
+      return
+    }
+
+    let promptText = extractPromptBlock(lastAssistant.content)
+    if (!promptText) {
+      // ask model to extract final prompt
+      try {
+        const res = await chatCompletion(get().apiKey, {
+          model: d.chatModel || d.model || 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'فقط پرامپت نهایی ساخت را داخل ```prompt بنویس. هیچ متن دیگری ننویس.',
+            },
+            {
+              role: 'user',
+              content: `از این پیشنهاد، پرامپت نهایی را استخراج کن:\n\n${lastAssistant.content}`,
+            },
+          ],
+          temperature: 0.2,
+        })
+        const content = res.choices?.[0]?.message?.content || ''
+        promptText = extractPromptBlock(content) || content.trim()
+      } catch {
+        promptText = lastAssistant.content.trim()
+      }
+    }
+
+    if (!promptText) {
+      alert('نتوانستم پرامپت قابل اعمال پیدا کنم.')
+      return
+    }
+
+    get().updateNodeData(nodeId, {
+      prompt: promptText,
+      chatMessages: [
+        ...msgs,
+        {
+          role: 'assistant',
+          content: `✓ روی پرامپت گره اعمال شد:\n${promptText.slice(0, 280)}${promptText.length > 280 ? '…' : ''}`,
+        },
+      ],
+    })
   },
 }))

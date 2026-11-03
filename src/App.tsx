@@ -4,9 +4,11 @@ import {
   Controls,
   MiniMap,
   NodeTypes,
+  useReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextNode } from './nodes/TextNode'
 import { ImageNode } from './nodes/ImageNode'
 import { VideoNode } from './nodes/VideoNode'
@@ -18,6 +20,7 @@ import { FileNode } from './nodes/FileNode'
 import { PromptNode } from './nodes/PromptNode'
 import { AppOutputNode } from './nodes/AppOutputNode'
 import { PropertiesPanel } from './components/PropertiesPanel'
+import { ContextMenu } from './components/ContextMenu'
 import { useCanvasStore } from './store/useCanvasStore'
 import { executeGraph, GraphCycleError } from './engine/graphEngine'
 import { readProjectFile } from './services/projectStorage'
@@ -48,8 +51,11 @@ const NODE_COLORS: Record<string, string> = {
   appOutput: '#06b6d4',
 }
 
-export default function App() {
+function CanvasInner() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { screenToFlowPosition } = useReactFlow()
+  const [menu, setMenu] = useState<{ x: number; y: number; flow: { x: number; y: number } } | null>(null)
+
   const {
     nodes,
     edges,
@@ -73,9 +79,7 @@ export default function App() {
   } = useCanvasStore()
 
   useEffect(() => {
-    const loaded = loadFromStorage()
-    // if old project has no prompt node, keep it; user can «شروع تازه»
-    void loaded
+    loadFromStorage()
   }, [loadFromStorage])
 
   const runGraph = useCallback(async () => {
@@ -134,6 +138,7 @@ export default function App() {
           label: 'پرامپت اصلی',
           prompt: 'یک ماشین حساب ساده با ظاهر مدرن بساز',
           models: ['gpt-4o', 'gpt-4o-mini'],
+          chatMessages: [],
           status: 'empty',
         },
       },
@@ -147,10 +152,49 @@ export default function App() {
     y: 80 + Math.random() * 300,
   })
 
+  const onPaneContextMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      e.preventDefault()
+      const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+      setMenu({ x: e.clientX, y: e.clientY, flow })
+    },
+    [screenToFlowPosition]
+  )
+
+  const menuItems = menu
+    ? [
+        {
+          id: 'prompt',
+          label: '+ گره پرامپت / چت / ایجنت',
+          onClick: () => addNode('prompt', menu.flow),
+        },
+        {
+          id: 'text',
+          label: '+ گره متن',
+          onClick: () => addNode('text', menu.flow),
+        },
+        {
+          id: 'image',
+          label: '+ گره تصویر',
+          onClick: () => addNode('image', menu.flow),
+        },
+        {
+          id: 'merge',
+          label: '+ گره ادغام',
+          onClick: () => addNode('merge', menu.flow),
+        },
+        {
+          id: 'appOutput',
+          label: '+ خروجی اپ',
+          onClick: () => addNode('appOutput', menu.flow),
+        },
+      ]
+    : []
+
   return (
     <div className="w-screen h-screen bg-[#111827] flex flex-col" dir="rtl">
       <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
-        <span className="text-white font-semibold text-lg shrink-0">Hadi</span>
+        <span className="text-white font-semibold text-lg shrink-0">hadi-canvas</span>
 
         <input
           className="bg-transparent text-slate-300 text-sm border border-slate-700 rounded px-2 py-1 w-36 focus:outline-none focus:border-blue-500 shrink-0"
@@ -196,7 +240,7 @@ export default function App() {
       </div>
 
       <div className="flex-1 flex min-h-0" dir="ltr">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 relative">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -204,7 +248,11 @@ export default function App() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(null)}
+            onPaneClick={() => {
+              setSelectedNodeId(null)
+              setMenu(null)
+            }}
+            onPaneContextMenu={onPaneContextMenu}
             nodeTypes={nodeTypes}
             fitView
             className="bg-[#111827]"
@@ -216,6 +264,15 @@ export default function App() {
               maskColor="rgba(0,0,0,0.6)"
             />
           </ReactFlow>
+
+          {menu && (
+            <ContextMenu
+              x={menu.x}
+              y={menu.y}
+              items={menuItems}
+              onClose={() => setMenu(null)}
+            />
+          )}
         </div>
 
         <div dir="rtl">
@@ -223,5 +280,13 @@ export default function App() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <CanvasInner />
+    </ReactFlowProvider>
   )
 }
