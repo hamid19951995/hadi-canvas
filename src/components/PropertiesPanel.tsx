@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useCanvasStore } from '../store/useCanvasStore'
 
 const MODELS = ['gpt-4o', 'gpt-4o-mini', 'claude-3.5-sonnet', 'gemini-pro', 'gpt-3.5-turbo']
@@ -39,14 +40,12 @@ export function PropertiesPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Meta */}
         <section className="space-y-1">
           <label className="text-[11px] text-slate-500 uppercase tracking-wide">نوع</label>
           <div className="text-sm text-slate-300">{typeLabel(type)}</div>
           <div className="text-[11px] text-slate-600 font-mono">id: {node.id}</div>
         </section>
 
-        {/* Label */}
         <Field label="عنوان">
           <input
             className={inputClass}
@@ -55,7 +54,6 @@ export function PropertiesPanel() {
           />
         </Field>
 
-        {/* Status badge */}
         <section className="space-y-1">
           <label className="text-[11px] text-slate-500 uppercase tracking-wide">وضعیت</label>
           <StatusBadge status={(data.status as string) || 'empty'} />
@@ -64,7 +62,6 @@ export function PropertiesPanel() {
           )}
         </section>
 
-        {/* Type-specific fields */}
         {type === 'text' && (
           <>
             <Field label="مدل">
@@ -143,7 +140,6 @@ export function PropertiesPanel() {
           </p>
         )}
 
-        {/* Result preview */}
         {!!data.result && (
           <Field label="آخرین خروجی">
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
@@ -156,7 +152,7 @@ export function PropertiesPanel() {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
       <label className="text-[11px] text-slate-500 uppercase tracking-wide">{label}</label>
