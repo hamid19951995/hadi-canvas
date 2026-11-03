@@ -1,8 +1,6 @@
 /**
- * GapGPT API Service
- * Compatible with OpenAI client format.
- * Base: https://api.gapgpt.app/v1
- * Docs: https://gapgpt.app/platform-v2/docs/quickstart
+ * Hadi — LLM API adapter (OpenAI-compatible)
+ * Default provider endpoint: https://api.gapgpt.app/v1
  */
 
 const BASE_URL = 'https://api.gapgpt.app/v1'
@@ -51,13 +49,12 @@ export async function chatCompletion(
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`GapGPT API error ${res.status}: ${err}`)
+    throw new Error(`API error ${res.status}: ${err}`)
   }
 
   return res.json()
 }
 
-/** Run a text node against GapGPT */
 export async function runTextNode(
   apiKey: string,
   model: string,
@@ -79,13 +76,11 @@ export async function runTextNode(
   return result.choices?.[0]?.message?.content ?? ''
 }
 
-/** Placeholder for image generation (GapGPT may expose /images/generations) */
 export async function generateImage(
   apiKey: string,
   prompt: string,
   model = 'dall-e-3'
 ): Promise<string> {
-  // Many GapGPT deployments proxy OpenAI image endpoint
   const res = await fetch(`${BASE_URL}/images/generations`, {
     method: 'POST',
     headers: {
