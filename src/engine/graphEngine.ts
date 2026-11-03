@@ -1,19 +1,16 @@
 /**
- * Graph Execution Engine — Phase 14
- * Builds a DAG from React Flow nodes/edges, topologically sorts,
- * and runs ready nodes in parallel waves.
+ * Graph Execution Engine — Hadi
+ * DAG + parallel waves
  */
 
 import type { Node, Edge } from '@xyflow/react'
-import { runTextNode } from '../services/gapgpt'
+import { runTextNode, generateImage } from '../services/gapgpt'
 
 export type NodeStatus = 'empty' | 'running' | 'success' | 'error'
 
 export interface ExecutionContext {
   apiKey: string
-  /** nodeId -> accumulated text result */
   results: Map<string, string>
-  /** called whenever a node status/data changes */
   onNodeUpdate: (id: string, patch: Record<string, unknown>) => void
 }
 
@@ -24,7 +21,6 @@ export class GraphCycleError extends Error {
   }
 }
 
-/** Build adjacency + in-degree from edges */
 export function buildGraph(nodes: Node[], edges: Edge[]) {
   const nodeIds = new Set(nodes.map((n) => n.id))
   const adjacency = new Map<string, string[]>()
@@ -47,7 +43,6 @@ export function buildGraph(nodes: Node[], edges: Edge[]) {
   return { adjacency, inDegree, predecessors, nodeIds }
 }
 
-/** Kahn's algorithm — throws GraphCycleError if cycle detected */
 export function topologicalSort(
   nodeIds: Set<string>,
   adjacency: Map<string, string[]>,
@@ -71,14 +66,10 @@ export function topologicalSort(
     }
   }
 
-  if (order.length !== nodeIds.size) {
-    throw new GraphCycleError()
-  }
-
+  if (order.length !== nodeIds.size) throw new GraphCycleError()
   return order
 }
 
-/** Group nodes into parallel waves (same wave = no mutual dependency) */
 export function buildExecutionWaves(
   order: string[],
   predecessors: Map<string, string[]>
@@ -97,7 +88,6 @@ export function buildExecutionWaves(
     if (!waves[w]) waves[w] = []
     waves[w].push(id)
   }
-
   return waves
 }
 
@@ -140,6 +130,27 @@ async function executeSingleNode(
         break
       }
 
+      case 'image': {
+        const upstream = collectUpstreamText(id, predecessors, ctx.results)
+        const prompt =
+          upstream ||
+          (d.prompt as string) ||
+          'A beautiful abstract digital art image, high quality'
+        const url = await generateImage(ctx.apiKey, prompt)
+        if (!url) throw new Error('آدرس تصویر برنگشت')
+        ctx.results.set(id, url)
+        ctx.onNodeUpdate(id, { status: 'success' as NodeStatus, result: url })
+        break
+      }
+
+      case 'video': {
+        const upstream = collectUpstreamText(id, predecessors, ctx.results)
+        const placeholder = `[ویدیو] پرامپت: ${(upstream || '').slice(0, 120) || '(خالی)'} — اتصال API ویدیو به‌زودی`
+        ctx.results.set(id, placeholder)
+        ctx.onNodeUpdate(id, { status: 'success' as NodeStatus, result: placeholder })
+        break
+      }
+
       case 'merge': {
         const upstream = collectUpstreamText(id, predecessors, ctx.results)
         const result = upstream || '(ورودی خالی)'
@@ -167,14 +178,8 @@ async function executeSingleNode(
         const upstream = collectUpstreamText(id, predecessors, ctx.results)
         let acc = upstream
         for (let i = 1; i <= iterations; i++) {
-          ctx.onNodeUpdate(id, {
-            status: 'running' as NodeStatus,
-            currentIteration: i,
-          })
-          // lightweight local iteration marker (no extra API spam by default)
-          acc = acc
-            ? `${acc}\n[دور ${i}/${iterations}]`
-            : `[دور ${i}/${iterations}]`
+          ctx.onNodeUpdate(id, { status: 'running' as NodeStatus, currentIteration: i })
+          acc = acc ? `${acc}\n[دور ${i}/${iterations}]` : `[دور ${i}/${iterations}]`
         }
         ctx.results.set(id, acc)
         ctx.onNodeUpdate(id, {
@@ -209,22 +214,6 @@ async function executeSingleNode(
         break
       }
 
-      case 'image':
-      case 'video': {
-        // Placeholder until media endpoints are fully wired
-        const upstream = collectUpstreamText(id, predecessors, ctx.results)
-        const placeholder =
-          type === 'image'
-            ? `[تصویر] پرامپت: ${upstream.slice(0, 120) || '(خالی)'}`
-            : `[ویدیو] پرامپت: ${upstream.slice(0, 120) || '(خالی)'}`
-        ctx.results.set(id, placeholder)
-        ctx.onNodeUpdate(id, {
-          status: 'success' as NodeStatus,
-          result: placeholder,
-        })
-        break
-      }
-
       default: {
         ctx.onNodeUpdate(id, {
           status: 'success' as NodeStatus,
@@ -235,14 +224,9 @@ async function executeSingleNode(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     ctx.onNodeUpdate(id, { status: 'error' as NodeStatus, error: message })
-    // Do not rethrow — allow other parallel nodes in the wave to finish
   }
 }
 
-/**
- * Execute the full graph in parallel waves.
- * Returns final results map.
- */
 export async function executeGraph(
   nodes: Node[],
   edges: Edge[],
@@ -255,7 +239,6 @@ export async function executeGraph(
   const waves = buildExecutionWaves(order, predecessors)
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
 
-  // Reset all to empty before run
   for (const id of nodeIds) {
     ctx.onNodeUpdate(id, { status: 'empty' as NodeStatus, error: undefined })
   }
