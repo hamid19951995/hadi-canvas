@@ -1,11 +1,11 @@
 /**
- * Project Save / Load — Phase 16
+ * Project Save / Load — Hadi
  * localStorage + JSON file export/import
  */
 
 import type { Node, Edge } from '@xyflow/react'
 
-export const STORAGE_KEY = 'gapgpt_canvas_project'
+export const STORAGE_KEY = 'hadi_canvas_project'
 export const PROJECT_VERSION = 1
 
 export interface CanvasProject {
@@ -19,7 +19,7 @@ export interface CanvasProject {
 export function createProject(
   nodes: Node[],
   edges: Edge[],
-  name = 'پروژه بدون نام'
+  name = 'Hadi'
 ): CanvasProject {
   return {
     version: PROJECT_VERSION,
@@ -36,7 +36,9 @@ export function saveToLocalStorage(project: CanvasProject): void {
 
 export function loadFromLocalStorage(): CanvasProject | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ||
+      localStorage.getItem('gapgpt_canvas_project') // مهاجرت از نام قبلی
     if (!raw) return null
     const data = JSON.parse(raw) as CanvasProject
     if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) return null
@@ -53,7 +55,7 @@ export function downloadProjectJson(project: CanvasProject): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${sanitizeFilename(project.name)}.gapgpt.json`
+  a.download = `${sanitizeFilename(project.name)}.hadi.json`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -79,5 +81,5 @@ export function readProjectFile(file: File): Promise<CanvasProject> {
 }
 
 function sanitizeFilename(name: string): string {
-  return (name || 'project').replace(/[^\w\u0600-\u06FF\-]+/g, '_').slice(0, 64)
+  return (name || 'hadi').replace(/[^\w\u0600-\u06FF\-]+/g, '_').slice(0, 64)
 }
