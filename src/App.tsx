@@ -11,6 +11,10 @@ import { TextNode } from './nodes/TextNode'
 import { ImageNode } from './nodes/ImageNode'
 import { VideoNode } from './nodes/VideoNode'
 import { MergeNode } from './nodes/MergeNode'
+import { ConditionalNode } from './nodes/ConditionalNode'
+import { LoopNode } from './nodes/LoopNode'
+import { MemoryNode } from './nodes/MemoryNode'
+import { FileNode } from './nodes/FileNode'
 import { useCanvasStore } from './store/useCanvasStore'
 import { runTextNode } from './services/gapgpt'
 
@@ -19,6 +23,21 @@ const nodeTypes: NodeTypes = {
   image: ImageNode,
   video: VideoNode,
   merge: MergeNode,
+  conditional: ConditionalNode,
+  loop: LoopNode,
+  memory: MemoryNode,
+  file: FileNode,
+}
+
+const NODE_COLORS: Record<string, string> = {
+  text: '#3b82f6',
+  image: '#8b5cf6',
+  video: '#ec4899',
+  merge: '#f59e0b',
+  conditional: '#f97316',
+  loop: '#14b8a6',
+  memory: '#6366f1',
+  file: '#10b981',
 }
 
 export default function App() {
@@ -65,53 +84,43 @@ export default function App() {
     }
   }, [apiKey, nodes, setIsRunning, setNodeStatus, updateNodeData])
 
+  const randomPos = () => ({
+    x: 80 + Math.random() * 400,
+    y: 80 + Math.random() * 300,
+  })
+
   return (
     <div className="w-screen h-screen bg-[#111827] flex flex-col">
-      <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-4 gap-4 shrink-0">
-        <span className="text-white font-semibold text-lg">GapGPT Canvas</span>
-        <span className="text-slate-400 text-sm hidden sm:inline">محیط گراف‌محور چندمدلی</span>
+      <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
+        <span className="text-white font-semibold text-lg shrink-0">GapGPT Canvas</span>
 
         <div className="flex-1" />
 
         <input
           type="password"
-          placeholder="کلید API گپ‌جی‌پی‌تی"
+          placeholder="کلید API"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-48 border border-slate-700 focus:outline-none focus:border-blue-500"
+          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-40 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
         />
 
-        <button
-          onClick={() => addNode('text', { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 })}
-          className="bg-blue-600 hover:bg-blue-500 text-white text-sm px-3 py-1.5 rounded-lg"
-        >
-          + متن
-        </button>
-        <button
-          onClick={() => addNode('image', { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 })}
-          className="bg-purple-600 hover:bg-purple-500 text-white text-sm px-3 py-1.5 rounded-lg"
-        >
-          + تصویر
-        </button>
-        <button
-          onClick={() => addNode('video', { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 })}
-          className="bg-pink-600 hover:bg-pink-500 text-white text-sm px-3 py-1.5 rounded-lg"
-        >
-          + ویدیو
-        </button>
-        <button
-          onClick={() => addNode('merge', { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 })}
-          className="bg-amber-600 hover:bg-amber-500 text-white text-sm px-3 py-1.5 rounded-lg"
-        >
-          + ادغام
-        </button>
+        <div className="flex gap-1.5 shrink-0">
+          <button onClick={() => addNode('text', randomPos())} className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ متن</button>
+          <button onClick={() => addNode('image', randomPos())} className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ تصویر</button>
+          <button onClick={() => addNode('video', randomPos())} className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ ویدیو</button>
+          <button onClick={() => addNode('merge', randomPos())} className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ ادغام</button>
+          <button onClick={() => addNode('conditional', randomPos())} className="bg-orange-600 hover:bg-orange-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ شرطی</button>
+          <button onClick={() => addNode('loop', randomPos())} className="bg-teal-600 hover:bg-teal-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ حلقه</button>
+          <button onClick={() => addNode('memory', randomPos())} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ حافظه</button>
+          <button onClick={() => addNode('file', randomPos())} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ فایل</button>
+        </div>
 
         <button
           onClick={runSelectedGraph}
           disabled={isRunning}
-          className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded-lg font-medium"
+          className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded-lg font-medium shrink-0"
         >
-          {isRunning ? 'در حال اجرا...' : '▶ اجرا'}
+          {isRunning ? '...' : '▶ اجرا'}
         </button>
       </div>
 
@@ -130,12 +139,7 @@ export default function App() {
           <Background color="#334155" gap={20} />
           <Controls />
           <MiniMap
-            nodeColor={(n) => {
-              if (n.type === 'image') return '#8b5cf6'
-              if (n.type === 'video') return '#ec4899'
-              if (n.type === 'merge') return '#f59e0b'
-              return '#3b82f6'
-            }}
+            nodeColor={(n) => NODE_COLORS[n.type || 'text'] || '#3b82f6'}
             maskColor="rgba(0,0,0,0.6)"
           />
         </ReactFlow>
