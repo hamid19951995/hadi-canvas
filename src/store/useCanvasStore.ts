@@ -1,5 +1,12 @@
 import { create } from 'zustand'
 import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from '@xyflow/react'
+import {
+  createProject,
+  saveToLocalStorage,
+  loadFromLocalStorage,
+  downloadProjectJson,
+  type CanvasProject,
+} from '../services/projectStorage'
 
 export type NodeStatus = 'empty' | 'running' | 'success' | 'error'
 
@@ -24,6 +31,7 @@ interface CanvasState {
   selectedNodeId: string | null
   apiKey: string
   isRunning: boolean
+  projectName: string
 
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
@@ -32,10 +40,14 @@ interface CanvasState {
   onConnect: (connection: Connection) => void
   setSelectedNodeId: (id: string | null) => void
   setApiKey: (key: string) => void
+  setProjectName: (name: string) => void
   updateNodeData: (id: string, data: Partial<CanvasNodeData>) => void
   setNodeStatus: (id: string, status: NodeStatus, extra?: Partial<CanvasNodeData>) => void
   addNode: (type: string, position: { x: number; y: number }) => void
   setIsRunning: (running: boolean) => void
+  saveProject: (download?: boolean) => void
+  loadProject: (project: CanvasProject) => void
+  loadFromStorage: () => boolean
 }
 
 const defaultNodes: Node[] = [
@@ -74,6 +86,15 @@ const defaultEdges: Edge[] = [
 
 let nodeIdCounter = 5
 
+function syncCounter(nodes: Node[]) {
+  let max = 0
+  for (const n of nodes) {
+    const num = parseInt(n.id, 10)
+    if (!Number.isNaN(num) && num > max) max = num
+  }
+  nodeIdCounter = max + 1
+}
+
 const NODE_LABELS: Record<string, string> = {
   text: 'مدل متنی',
   image: 'تولید تصویر',
@@ -91,6 +112,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedNodeId: null,
   apiKey: localStorage.getItem('gapgpt_api_key') || '',
   isRunning: false,
+  projectName: 'پروژه بدون نام',
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -113,6 +135,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     localStorage.setItem('gapgpt_api_key', key)
     set({ apiKey: key })
   },
+
+  setProjectName: (name) => set({ projectName: name }),
 
   updateNodeData: (id, data) => {
     set({
@@ -160,4 +184,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   setIsRunning: (running) => set({ isRunning: running }),
+
+  saveProject: (download = false) => {
+    const { nodes, edges, projectName } = get()
+    const project = createProject(nodes, edges, projectName)
+    saveToLocalStorage(project)
+    if (download) downloadProjectJson(project)
+  },
+
+  loadProject: (project) => {
+    syncCounter(project.nodes)
+    set({
+      nodes: project.nodes,
+      edges: project.edges,
+      projectName: project.name || 'پروژه بدون نام',
+      selectedNodeId: null,
+    })
+    saveToLocalStorage(project)
+  },
+
+  loadFromStorage: () => {
+    const project = loadFromLocalStorage()
+    if (!project) return false
+    get().loadProject(project)
+    return true
+  },
 }))
