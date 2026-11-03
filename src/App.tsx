@@ -70,7 +70,7 @@ export default function App() {
 
   const runGraph = useCallback(async () => {
     if (!apiKey) {
-      alert('لطفاً کلید API گپ‌جی‌پی‌تی را وارد کنید')
+      alert('لطفاً کلید API را وارد کنید')
       return
     }
     if (!nodes.length) {
@@ -132,7 +132,7 @@ export default function App() {
   return (
     <div className="w-screen h-screen bg-[#111827] flex flex-col">
       <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
-        <span className="text-white font-semibold text-lg shrink-0">GapGPT Canvas</span>
+        <span className="text-white font-semibold text-lg shrink-0">Hadi</span>
 
         <input
           className="bg-transparent text-slate-300 text-sm border border-slate-700 rounded px-2 py-1 w-36 focus:outline-none focus:border-blue-500 shrink-0"
@@ -148,7 +148,7 @@ export default function App() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,application/json"
+            accept=".json,.hadi.json,application/json"
             className="hidden"
             onChange={handleFileChange}
           />
