@@ -106,13 +106,21 @@ const NODE_LABELS: Record<string, string> = {
   file: 'فایل',
 }
 
+function readApiKey() {
+  return (
+    localStorage.getItem('hadi_api_key') ||
+    localStorage.getItem('gapgpt_api_key') ||
+    ''
+  )
+}
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: defaultNodes,
   edges: defaultEdges,
   selectedNodeId: null,
-  apiKey: localStorage.getItem('gapgpt_api_key') || '',
+  apiKey: readApiKey(),
   isRunning: false,
-  projectName: 'پروژه بدون نام',
+  projectName: 'Hadi',
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -132,7 +140,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setSelectedNodeId: (id) => set({ selectedNodeId: id }),
 
   setApiKey: (key) => {
-    localStorage.setItem('gapgpt_api_key', key)
+    localStorage.setItem('hadi_api_key', key)
     set({ apiKey: key })
   },
 
@@ -187,7 +195,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   saveProject: (download = false) => {
     const { nodes, edges, projectName } = get()
-    const project = createProject(nodes, edges, projectName)
+    const project = createProject(nodes, edges, projectName || 'Hadi')
     saveToLocalStorage(project)
     if (download) downloadProjectJson(project)
   },
@@ -197,7 +205,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       nodes: project.nodes,
       edges: project.edges,
-      projectName: project.name || 'پروژه بدون نام',
+      projectName: project.name || 'Hadi',
       selectedNodeId: null,
     })
     saveToLocalStorage(project)
