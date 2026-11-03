@@ -7,6 +7,7 @@ import {
   downloadProjectJson,
   type CanvasProject,
 } from '../services/projectStorage'
+import { runTextNode } from '../services/gapgpt'
 
 export type NodeStatus = 'empty' | 'running' | 'success' | 'error'
 
@@ -14,6 +15,7 @@ export interface CanvasNodeData {
   label: string
   model?: string
   prompt?: string
+  models?: string[]
   status: NodeStatus
   result?: string
   error?: string
@@ -48,54 +50,43 @@ interface CanvasState {
   saveProject: (download?: boolean) => void
   loadProject: (project: CanvasProject) => void
   loadFromStorage: () => boolean
+  runParallelBuild: (promptNodeId: string) => Promise<void>
 }
+
+const APP_SYSTEM = `تو یک مهندس فرانت‌اند هستی. فقط یک فایل HTML کامل و قابل اجرا تولید کن (با CSS و JS درون‌خطی).
+زبان رابط: فارسی و dir=rtl مگر خلافش خواسته شود.
+خروجی را داخل بلوک markdown با برچسب html بگذار.
+هیچ توضیح اضافه‌ای بیرون از بلوک کد ننویس.`
 
 const defaultNodes: Node[] = [
   {
-    id: '1',
-    type: 'text',
-    position: { x: 80, y: 120 },
-    data: { label: 'مدل متنی', model: 'gpt-4o', prompt: '', status: 'empty' },
-  },
-  {
-    id: '2',
-    type: 'image',
-    position: { x: 420, y: 80 },
-    data: { label: 'تولید تصویر', status: 'empty' },
-  },
-  {
-    id: '3',
-    type: 'video',
-    position: { x: 420, y: 280 },
-    data: { label: 'تولید ویدیو', status: 'empty' },
-  },
-  {
-    id: '4',
-    type: 'merge',
-    position: { x: 720, y: 160 },
-    data: { label: 'ادغام نتایج', status: 'empty' },
+    id: 'prompt',
+    type: 'prompt',
+    position: { x: 280, y: 40 },
+    data: {
+      label: 'پرامپت اصلی',
+      prompt: 'یک ماشین حساب ساده با ظاهر مدرن بساز',
+      models: ['gpt-4o', 'gpt-4o-mini'],
+      status: 'empty',
+    },
   },
 ]
 
-const defaultEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', animated: true },
-  { id: 'e1-3', source: '1', target: '3', animated: true },
-  { id: 'e2-4', source: '2', target: '4', targetHandle: 'a', animated: true },
-  { id: 'e3-4', source: '3', target: '4', targetHandle: 'b', animated: true },
-]
+const defaultEdges: Edge[] = []
 
-let nodeIdCounter = 5
+let nodeIdCounter = 10
 
 function syncCounter(nodes: Node[]) {
   let max = 0
   for (const n of nodes) {
-    const num = parseInt(n.id, 10)
+    const num = parseInt(n.id.replace(/\D/g, ''), 10)
     if (!Number.isNaN(num) && num > max) max = num
   }
-  nodeIdCounter = max + 1
+  nodeIdCounter = Math.max(10, max + 1)
 }
 
 const NODE_LABELS: Record<string, string> = {
+  prompt: 'پرامپت اصلی',
   text: 'مدل متنی',
   image: 'تولید تصویر',
   video: 'تولید ویدیو',
@@ -104,6 +95,7 @@ const NODE_LABELS: Record<string, string> = {
   loop: 'حلقه',
   memory: 'حافظه',
   file: 'فایل',
+  appOutput: 'خروجی اپ',
 }
 
 function readApiKey() {
@@ -168,27 +160,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       label: NODE_LABELS[type] || type,
       status: 'empty',
     }
-    if (type === 'text') {
+    if (type === 'text' || type === 'prompt') {
       baseData.model = 'gpt-4o'
       baseData.prompt = ''
+      if (type === 'prompt') baseData.models = ['gpt-4o']
     }
-    if (type === 'conditional') {
-      baseData.condition = 'شامل «بله» باشد'
-    }
-    if (type === 'loop') {
-      baseData.iterations = 3
-    }
-    if (type === 'file') {
-      baseData.mode = 'input'
-    }
+    if (type === 'conditional') baseData.condition = 'شامل «بله» باشد'
+    if (type === 'loop') baseData.iterations = 3
+    if (type === 'file') baseData.mode = 'input'
 
-    const newNode: Node = {
-      id,
-      type,
-      position,
-      data: baseData,
-    }
-    set({ nodes: [...get().nodes, newNode] })
+    set({ nodes: [...get().nodes, { id, type, position, data: baseData }] })
   },
 
   setIsRunning: (running) => set({ isRunning: running }),
@@ -216,5 +197,93 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (!project) return false
     get().loadProject(project)
     return true
+  },
+
+  /**
+   * Real multi-model build (like the گراف prototype, but live API):
+   * 1) read prompt + selected models from PromptNode
+   * 2) create a text node + appOutput node per model
+   * 3) call API in parallel
+   * 4) put real HTML/text into output nodes
+   */
+  runParallelBuild: async (promptNodeId) => {
+    const state = get()
+    const promptNode = state.nodes.find((n) => n.id === promptNodeId)
+    if (!promptNode) return
+
+    const d = promptNode.data as CanvasNodeData
+    const userPrompt = (d.prompt || '').trim()
+    if (!userPrompt) {
+      alert('ابتدا پرامپت را بنویسید')
+      return
+    }
+    const models = (d.models && d.models.length ? d.models : ['gpt-4o']) as string[]
+
+    set({ isRunning: true })
+    get().updateNodeData(promptNodeId, { status: 'running' })
+
+    const origin = promptNode.position
+    const created: { modelId: string; outId: string; model: string }[] = []
+    let nodes = [...get().nodes]
+    let edges = [...get().edges]
+
+    models.forEach((model, i) => {
+      const modelId = `m${nodeIdCounter++}`
+      const outId = `o${nodeIdCounter++}`
+      const x = origin.x - 120 + i * 280
+      const yModel = origin.y + 220
+      const yOut = yModel + 200
+
+      nodes.push({
+        id: modelId,
+        type: 'text',
+        position: { x, y: yModel },
+        data: {
+          label: `مدل · ${model}`,
+          model,
+          prompt: userPrompt,
+          status: 'running',
+        },
+      })
+      nodes.push({
+        id: outId,
+        type: 'appOutput',
+        position: { x: x + 10, y: yOut },
+        data: {
+          label: `خروجی · ${model}`,
+          model,
+          status: 'running',
+        },
+      })
+      edges.push(
+        { id: `e-${promptNodeId}-${modelId}`, source: promptNodeId, target: modelId, animated: true },
+        { id: `e-${modelId}-${outId}`, source: modelId, target: outId, animated: true }
+      )
+      created.push({ modelId, outId, model })
+    })
+
+    set({ nodes, edges })
+
+    await Promise.all(
+      created.map(async ({ modelId, outId, model }) => {
+        try {
+          const result = await runTextNode(
+            get().apiKey,
+            model,
+            userPrompt,
+            APP_SYSTEM
+          )
+          get().updateNodeData(modelId, { status: 'success', result })
+          get().updateNodeData(outId, { status: 'success', result, model })
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          get().updateNodeData(modelId, { status: 'error', error: message })
+          get().updateNodeData(outId, { status: 'error', error: message })
+        }
+      })
+    )
+
+    get().updateNodeData(promptNodeId, { status: 'success' })
+    set({ isRunning: false })
   },
 }))
