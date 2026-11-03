@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { useCanvasStore } from '../store/useCanvasStore'
+import { getTextModels, MODEL_CATEGORIES, ALL_MODELS } from '../data/models'
 
-const MODELS = ['gpt-4o', 'gpt-4o-mini', 'claude-3.5-sonnet', 'gemini-pro', 'gpt-3.5-turbo']
+const TEXT_MODELS = getTextModels()
 
 export function PropertiesPanel() {
   const { nodes, selectedNodeId, updateNodeData, setSelectedNodeId } = useCanvasStore()
@@ -62,7 +63,7 @@ export function PropertiesPanel() {
           )}
         </section>
 
-        {type === 'text' && (
+        {(type === 'text' || type === 'prompt') && (
           <>
             <Field label="مدل">
               <select
@@ -70,9 +71,19 @@ export function PropertiesPanel() {
                 value={(data.model as string) || 'gpt-4o'}
                 onChange={(e) => set({ model: e.target.value })}
               >
-                {MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {MODEL_CATEGORIES.filter((c) => c.id !== 'image').map((cat) => {
+                  const opts = TEXT_MODELS.filter((m) => m.category === cat.id)
+                  if (!opts.length) return null
+                  return (
+                    <optgroup key={cat.id} label={`${cat.emoji} ${cat.label}`}>
+                      {opts.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )
+                })}
               </select>
             </Field>
             <Field label="پرامپت">
@@ -84,6 +95,22 @@ export function PropertiesPanel() {
               />
             </Field>
           </>
+        )}
+
+        {type === 'image' && (
+          <Field label="مدل تصویر">
+            <select
+              className={inputClass}
+              value={(data.model as string) || 'dall-e-3'}
+              onChange={(e) => set({ model: e.target.value })}
+            >
+              {ALL_MODELS.filter((m) => m.kind === 'image').map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label} ({m.provider})
+                </option>
+              ))}
+            </select>
+          </Field>
         )}
 
         {type === 'conditional' && (
@@ -105,7 +132,11 @@ export function PropertiesPanel() {
               max={50}
               className={inputClass}
               value={Number(data.iterations) || 3}
-              onChange={(e) => set({ iterations: Math.max(1, Math.min(50, Number(e.target.value) || 1)) })}
+              onChange={(e) =>
+                set({
+                  iterations: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                })
+              }
             />
           </Field>
         )}
@@ -133,10 +164,9 @@ export function PropertiesPanel() {
           </>
         )}
 
-        {(type === 'image' || type === 'video') && (
+        {type === 'video' && (
           <p className="text-xs text-slate-500 leading-relaxed">
-            این نود از خروجی نودهای بالادستی به‌عنوان پرامپت استفاده می‌کند.
-            اتصال API رسانه در نسخه بعدی کامل می‌شود.
+            نود ویدیو از خروجی بالادستی به‌عنوان پرامپت استفاده می‌کند.
           </p>
         )}
 
@@ -183,6 +213,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function typeLabel(type: string) {
   const map: Record<string, string> = {
+    prompt: 'پرامپت اصلی',
     text: 'نود متنی',
     image: 'نود تصویر',
     video: 'نود ویدیو',
@@ -191,6 +222,7 @@ function typeLabel(type: string) {
     loop: 'نود حلقه',
     memory: 'نود حافظه',
     file: 'نود فایل',
+    appOutput: 'خروجی اپ',
   }
   return map[type] || type
 }
