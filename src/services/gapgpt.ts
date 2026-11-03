@@ -1,9 +1,9 @@
 /**
- * Hadi — LLM API adapter (OpenAI-compatible)
- * Default provider endpoint: https://api.gapgpt.app/v1
+ * Hadi — LLM/Image client
+ * Prefers local proxy (/api/*) so the key can stay server-side.
  */
 
-const BASE_URL = 'https://api.gapgpt.app/v1'
+const DIRECT_BASE = 'https://api.gapgpt.app/v1'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -34,25 +34,36 @@ export interface ChatCompletionResponse {
   }
 }
 
-export async function chatCompletion(
-  apiKey: string,
-  request: ChatCompletionRequest
-): Promise<ChatCompletionResponse> {
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+async function postJson(url: string, apiKey: string, body: unknown) {
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {}),
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify(body),
   })
-
   if (!res.ok) {
     const err = await res.text()
     throw new Error(`API error ${res.status}: ${err}`)
   }
-
   return res.json()
+}
+
+/** Try proxy first; fall back to direct provider URL */
+async function chatViaProxyOrDirect(apiKey: string, request: ChatCompletionRequest) {
+  try {
+    return await postJson('/api/chat', apiKey, { ...request, apiKey })
+  } catch {
+    return postJson(`${DIRECT_BASE}/chat/completions`, apiKey, request)
+  }
+}
+
+export async function chatCompletion(
+  apiKey: string,
+  request: ChatCompletionRequest
+): Promise<ChatCompletionResponse> {
+  return chatViaProxyOrDirect(apiKey, request)
 }
 
 export async function runTextNode(
@@ -62,9 +73,7 @@ export async function runTextNode(
   systemPrompt?: string
 ): Promise<string> {
   const messages: ChatMessage[] = []
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt })
-  }
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
   messages.push({ role: 'user', content: prompt })
 
   const result = await chatCompletion(apiKey, {
@@ -72,7 +81,6 @@ export async function runTextNode(
     messages,
     temperature: 0.7,
   })
-
   return result.choices?.[0]?.message?.content ?? ''
 }
 
@@ -81,25 +89,16 @@ export async function generateImage(
   prompt: string,
   model = 'dall-e-3'
 ): Promise<string> {
-  const res = await fetch(`${BASE_URL}/images/generations`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  let data: any
+  try {
+    data = await postJson('/api/images', apiKey, { prompt, model, apiKey })
+  } catch {
+    data = await postJson(`${DIRECT_BASE}/images/generations`, apiKey, {
       model,
       prompt,
       n: 1,
       size: '1024x1024',
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Image generation error ${res.status}: ${err}`)
+    })
   }
-
-  const data = await res.json()
   return data.data?.[0]?.url ?? data.url ?? ''
 }
