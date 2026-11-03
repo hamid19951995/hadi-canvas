@@ -1,6 +1,5 @@
 /**
- * GapGPT Node Canvas — Design Tokens
- * Phase 11
+ * Hadi — Design Tokens
  */
 
 :root {
@@ -20,14 +19,14 @@
   --color-text-disabled: #64748b;
 
   /* ── Accent (node types) ── */
-  --color-accent-blue: #3b82f6;      /* text */
-  --color-accent-purple: #8b5cf6;    /* image */
-  --color-accent-pink: #ec4899;      /* video */
-  --color-accent-amber: #f59e0b;     /* merge */
-  --color-accent-orange: #f97316;    /* conditional */
-  --color-accent-teal: #14b8a6;      /* loop */
-  --color-accent-indigo: #6366f1;    /* memory */
-  --color-accent-emerald: #10b981;   /* file */
+  --color-accent-blue: #3b82f6;
+  --color-accent-purple: #8b5cf6;
+  --color-accent-pink: #ec4899;
+  --color-accent-amber: #f59e0b;
+  --color-accent-orange: #f97316;
+  --color-accent-teal: #14b8a6;
+  --color-accent-indigo: #6366f1;
+  --color-accent-emerald: #10b981;
 
   /* ── Status ── */
   --color-status-success: #22c55e;
@@ -85,7 +84,4 @@
   --z-sticky: 20;
   --z-modal: 50;
   --z-toast: 100;
-
-  /* ── Breakpoints (reference) ── */
-  /* mobile: 390px | tablet: 768px | desktop: 1024px+ */
 }
