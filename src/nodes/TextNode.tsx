@@ -27,7 +27,7 @@ export function TextNode({ data }: NodeProps) {
       {status === 'running' && <div className="mt-2 text-xs text-blue-400">در حال اجرای واقعی API...</div>}
       {status === 'success' && <div className="mt-2 text-xs text-green-400">پاسخ واقعی دریافت شد</div>}
       {status === 'error' && <div className="mt-2 text-xs text-red-400">{d.error || 'خطا'}</div>}
-      <Handle type="source" isolator="false" position={Position.Bottom} className="!bg-blue-500" />
+      <Handle type="source" position={Position.Bottom} className="!bg-blue-500" />
       <Handle type="source" position={Position.Right} className="!bg-blue-500" id="out-right" />
     </div>
   )
