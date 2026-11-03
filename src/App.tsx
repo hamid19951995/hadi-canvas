@@ -69,10 +69,7 @@ export default function App() {
   }, [loadFromStorage])
 
   const runGraph = useCallback(async () => {
-    if (!apiKey) {
-      alert('لطفاً کلید API را وارد کنید')
-      return
-    }
+    // apiKey optional when server has HADI_API_KEY
     if (!nodes.length) {
       alert('نودی برای اجرا وجود ندارد')
       return
@@ -103,13 +100,8 @@ export default function App() {
     alert('پروژه در مرورگر ذخیره شد')
   }
 
-  const handleExport = () => {
-    saveProject(true)
-  }
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
+  const handleExport = () => saveProject(true)
+  const handleImportClick = () => fileInputRef.current?.click()
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -130,7 +122,7 @@ export default function App() {
   })
 
   return (
-    <div className="w-screen h-screen bg-[#111827] flex flex-col">
+    <div className="w-screen h-screen bg-[#111827] flex flex-col" dir="rtl">
       <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
         <span className="text-white font-semibold text-lg shrink-0">Hadi</span>
 
@@ -145,23 +137,17 @@ export default function App() {
           <button onClick={handleSave} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">ذخیره</button>
           <button onClick={handleExport} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">خروجی JSON</button>
           <button onClick={handleImportClick} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">بارگذاری</button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,.hadi.json,application/json"
-            className="hidden"
-            onChange={handleFileChange}
-          />
+          <input ref={fileInputRef} type="file" accept=".json,.hadi.json,application/json" className="hidden" onChange={handleFileChange} />
         </div>
 
         <div className="flex-1" />
 
         <input
           type="password"
-          placeholder="کلید API"
+          placeholder="کلید API (اختیاری اگر سرور دارد)"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-36 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
+          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-48 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
         />
 
         <div className="flex gap-1.5 shrink-0">
@@ -184,7 +170,8 @@ export default function App() {
         </button>
       </div>
 
-      <div className="flex-1 flex min-h-0">
+      {/* LTR shell so panel stays on the physical right */}
+      <div className="flex-1 flex min-h-0" dir="ltr">
         <div className="flex-1 min-w-0">
           <ReactFlow
             nodes={nodes}
@@ -207,7 +194,9 @@ export default function App() {
           </ReactFlow>
         </div>
 
-        <PropertiesPanel />
+        <div dir="rtl">
+          <PropertiesPanel />
+        </div>
       </div>
     </div>
   )
