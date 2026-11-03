@@ -1,6 +1,6 @@
 # فازهای پروژه GapGPT Node Canvas
 
-## فازهای طراحی (Figma)
+## فازهای طراحی و تحویل — همه کامل ✅
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
@@ -8,10 +8,12 @@
 | ۰۹ | Tablet & Responsive | ✅ |
 | ۱۰ | Advanced Nodes | ✅ |
 | ۱۱ | Design Tokens | ✅ |
-| **۱۲** | Interactive Prototype | ✅ |
-| ۱۳ | Handoff | ⏳ |
+| ۱۲ | Interactive Prototype | ✅ |
+| **۱۳** | Handoff | ✅ |
 
-## نودهای پیاده‌شده در کد
+جزئیات تحویل: [handoff.md](./handoff.md)
+
+## نودهای پیاده‌شده
 
 | نوع | کامپوننت | رنگ |
 |-----|----------|-----|
@@ -24,13 +26,10 @@
 | حافظه | MemoryNode | ایندیگو |
 | فایل | FileNode | زمردی |
 
-## فازهای توسعه
+## backlog پیشنهادی بعد از Handoff
 
-- ✅ راه‌اندازی React + XYFlow + Zustand
-- ✅ نودهای پایه و پیشرفته
-- ✅ اتصال به GapGPT API
-- ✅ Design Tokens
-- ✅ Interactive Prototype (Figma)
-- ⏳ موتور اجرای گراف (DAG + موازی)
-- ⏳ Properties Panel
-- ⏳ ذخیره/بارگذاری پروژه
+- موتور اجرای گراف (DAG + موازی)
+- Properties Panel
+- بک‌اند برای محافظت از API key
+- منطق واقعی Conditional / Loop / Memory / File
+- ذخیره و بارگذاری پروژه
