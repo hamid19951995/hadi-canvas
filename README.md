@@ -2,31 +2,31 @@
 
 **Visual Node-based Multi-Model AI Canvas for GapGPT**
 
-یک محیط گراف‌محور (Node-based) برای کار موازی با چندین مدل هوش مصنوعی، تولید تصویر و ویدیو، و ساخت پروژه‌های پیچیده به صورت متصل و بصری.
+محیط گراف‌محور برای کار موازی با چندین مدل هوش مصنوعی، تولید تصویر/ویدیو و ساخت پروژه‌های متصل.
 
 ---
 
-## لینک‌های مرتبط
+## لینک‌ها
 
-| سرویس | لینک |
-|-------|------|
+| منبع | آدرس |
+|------|------|
 | **Figma** | [Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
-| **GitHub** | این ریپازیتوری |
 | **Canva** | [پرزنتیشن](https://canva.link/0rmc00upjb16qo8) |
-| **GapGPT API Docs** | [Quickstart](https://gapgpt.app/platform-v2/docs/quickstart) |
+| **Handoff** | [docs/handoff.md](./docs/handoff.md) |
+| **GapGPT API** | [Quickstart](https://gapgpt.app/platform-v2/docs/quickstart) |
 
 ---
 
-## فازهای طراحی (Figma)
+## فازها (همه کامل شدند)
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
-| ۰۰–۰۸ | Cover تا Empty State & Onboarding | ✅ |
-| **۰۹** | Tablet & Responsive | ✅ انجام شد |
-| ۱۰ | نودهای پیشرفته | ⏳ |
-| ۱۱ | Design Tokens | ⏳ |
-| ۱۲ | پروتوتایپ تعاملی | ⏳ |
-| ۱۳ | Handoff | ⏳ |
+| ۰۰–۰۸ | Layout تا Empty State & Onboarding | ✅ |
+| ۰۹ | Tablet & Responsive | ✅ |
+| ۱۰ | Advanced Nodes | ✅ |
+| ۱۱ | Design Tokens | ✅ |
+| ۱۲ | Interactive Prototype | ✅ |
+| ۱۳ | Handoff | ✅ |
 
 ---
 
@@ -37,53 +37,36 @@ npm install
 npm run dev
 ```
 
-سپس کلید API گپ‌جی‌پی‌تی را از [پنل توسعه‌دهندگان](https://gapgpt.app/platform-v2/docs/quickstart) بگیرید و در نوار بالای اپ وارد کنید.
+کلید API را از [پنل GapGPT](https://gapgpt.app/platform-v2/docs/quickstart) بگیرید و در نوار بالای اپ وارد کنید.
 
-### ساختار کد
+---
+
+## ساختار
 
 ```
 src/
-├── main.tsx
-├── App.tsx                 # بوم اصلی + کنترل‌ها
-├── index.css
-├── nodes/
-│   ├── TextNode.tsx
-│   ├── ImageNode.tsx
-│   ├── VideoNode.tsx
-│   └── MergeNode.tsx
-├── store/
-│   └── useCanvasStore.ts   # Zustand state
-└── services/
-    └── gapgpt.ts           # اتصال واقعی به API
+├── App.tsx
+├── nodes/          # Text, Image, Video, Merge, Conditional, Loop, Memory, File
+├── store/          # Zustand
+├── services/       # GapGPT API
+└── styles/         # Design tokens (CSS + TS)
 ```
 
----
+## قابلیت‌ها
 
-## قابلیت‌های فعلی
+- ۸ نوع نود با حالت empty / running / success / error
+- Zustand برای state
+- اتصال واقعی به GapGPT (`/v1/chat/completions`)
+- Design Tokens یکپارچه با Tailwind
+- Prototype تعاملی در Figma
 
-- ✅ ۴ نوع نود: متن، تصویر، ویدیو، ادغام
-- ✅ مدیریت state با Zustand
-- ✅ اتصال واقعی به GapGPT API (OpenAI-compatible)
-- ✅ اجرای نودهای متنی با یک کلیک
-- ✅ افزودن نود جدید از نوار بالا
-- ✅ طراحی ریسپانسیو (تبلت + موبایل) در Figma
+## مستندات
 
----
-
-## GapGPT API
-
-```ts
-// Base URL
-https://api.gapgpt.app/v1
-
-// مثال
-const client = new OpenAI({
-  baseURL: 'https://api.gapgpt.app/v1',
-  apiKey: 'YOUR_KEY',
-})
-```
-
-مدل‌های پشتیبانی‌شده: `gpt-4o`, `claude-3`, `gemini-pro` و سایر مدل‌های موجود در پنل.
+- [Handoff برای توسعه‌دهنده](./docs/handoff.md)
+- [Design Tokens](./docs/design-tokens.md)
+- [Prototype](./docs/prototype.md)
+- [Phases](./docs/phases.md)
+- [Architecture](./docs/architecture.md)
 
 ---
 
