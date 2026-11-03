@@ -6,27 +6,14 @@
 
 ---
 
-## هدف پروژه
-
-تبدیل تجربه فعلی GapGPT (چت‌های جداگانه) به یک بوم گرافیکی متصل که در آن:
-
-- هر **گره (Node)** یک مدل انتخاب‌شده است (GPT، Claude، Gemini، Grok، مدل تصویر، مدل ویدیو و ...)
-- گره‌ها می‌توانند به هم متصل شوند و خروجی یکی ورودی دیگری شود
-- چندین مدل به صورت **موازی** کار کنند
-- خروجی متنی مستقیماً به نود تصویر یا ویدیو وصل شود
-- پروژه‌های مختلف قابل ادغام باشند
-- تمام قابلیت‌های GapGPT داخل همین محیط در دسترس باشد
-
----
-
 ## لینک‌های مرتبط
 
 | سرویس | لینک |
 |-------|------|
-| **Figma (جدید)** | [GapGPT Node Canvas - Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
-| **Figma (قبلی)** | [طراحی اولیه](https://www.figma.com/design/GjuH4saP1RX4JB85zPR8Y1) |
+| **Figma** | [Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
 | **GitHub** | این ریپازیتوری |
-| **Canva Presentation** | [پرزنتیشن معرفی پروژه](https://canva.link/0rmc00upjb16qo8) |
+| **Canva** | [پرزنتیشن](https://canva.link/0rmc00upjb16qo8) |
+| **GapGPT API Docs** | [Quickstart](https://gapgpt.app/platform-v2/docs/quickstart) |
 
 ---
 
@@ -34,9 +21,8 @@
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
-| ۰۰–۰۷ | Cover تا Node States | ✅ |
-| **۰۸** | Empty State + Onboarding + Quick Start | ✅ انجام شد |
-| ۰۹ | نسخه تبلت / ریسپانسیو | ⏳ |
+| ۰۰–۰۸ | Cover تا Empty State & Onboarding | ✅ |
+| **۰۹** | Tablet & Responsive | ✅ انجام شد |
 | ۱۰ | نودهای پیشرفته | ⏳ |
 | ۱۱ | Design Tokens | ⏳ |
 | ۱۲ | پروتوتایپ تعاملی | ⏳ |
@@ -44,45 +30,60 @@
 
 ---
 
-## شروع سریع (کد)
+## شروع سریع
 
 ```bash
 npm install
 npm run dev
 ```
 
-پروژه روی `http://localhost:5173` اجرا می‌شود.
+سپس کلید API گپ‌جی‌پی‌تی را از [پنل توسعه‌دهندگان](https://gapgpt.app/platform-v2/docs/quickstart) بگیرید و در نوار بالای اپ وارد کنید.
 
-### ساختار فعلی کد
+### ساختار کد
 
 ```
 src/
 ├── main.tsx
-├── App.tsx              # بوم اصلی با React Flow
+├── App.tsx                 # بوم اصلی + کنترل‌ها
 ├── index.css
-└── nodes/
-    ├── TextNode.tsx     # نود متنی با حالت‌ها
-    └── ImageNode.tsx    # نود تصویر
+├── nodes/
+│   ├── TextNode.tsx
+│   ├── ImageNode.tsx
+│   ├── VideoNode.tsx
+│   └── MergeNode.tsx
+├── store/
+│   └── useCanvasStore.ts   # Zustand state
+└── services/
+    └── gapgpt.ts           # اتصال واقعی به API
 ```
 
 ---
 
-## تکنولوژی‌ها
+## قابلیت‌های فعلی
 
-- React 18 + TypeScript
-- XYFlow (React Flow) برای گراف
-- Zustand (آماده برای state)
-- Tailwind CSS
-- Vite
+- ✅ ۴ نوع نود: متن، تصویر، ویدیو، ادغام
+- ✅ مدیریت state با Zustand
+- ✅ اتصال واقعی به GapGPT API (OpenAI-compatible)
+- ✅ اجرای نودهای متنی با یک کلیک
+- ✅ افزودن نود جدید از نوار بالا
+- ✅ طراحی ریسپانسیو (تبلت + موبایل) در Figma
 
 ---
 
-## وضعیت فعلی (۳ نوامبر ۲۰۲۶)
+## GapGPT API
 
-- ✅ ریپازیتوری ایجاد و اسکلت فرانت‌اند آماده
-- ✅ فاز ۸ طراحی (Empty State + Onboarding) در Figma جدید
-- ✅ پرزنتیشن Canva آماده
-- 🔄 ادامه فازهای طراحی و توسعه نودها
+```ts
+// Base URL
+https://api.gapgpt.app/v1
+
+// مثال
+const client = new OpenAI({
+  baseURL: 'https://api.gapgpt.app/v1',
+  apiKey: 'YOUR_KEY',
+})
+```
+
+مدل‌های پشتیبانی‌شده: `gpt-4o`, `claude-3`, `gemini-pro` و سایر مدل‌های موجود در پنل.
 
 ---
 
