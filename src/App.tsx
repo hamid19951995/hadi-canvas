@@ -6,7 +6,7 @@ import {
   NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { TextNode } from './nodes/TextNode'
 import { ImageNode } from './nodes/ImageNode'
 import { VideoNode } from './nodes/VideoNode'
@@ -18,6 +18,7 @@ import { FileNode } from './nodes/FileNode'
 import { PropertiesPanel } from './components/PropertiesPanel'
 import { useCanvasStore } from './store/useCanvasStore'
 import { executeGraph, GraphCycleError } from './engine/graphEngine'
+import { readProjectFile } from './services/projectStorage'
 
 const nodeTypes: NodeTypes = {
   text: TextNode,
@@ -42,6 +43,7 @@ const NODE_COLORS: Record<string, string> = {
 }
 
 export default function App() {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const {
     nodes,
     edges,
@@ -55,7 +57,16 @@ export default function App() {
     addNode,
     isRunning,
     setIsRunning,
+    projectName,
+    setProjectName,
+    saveProject,
+    loadProject,
+    loadFromStorage,
   } = useCanvasStore()
+
+  useEffect(() => {
+    loadFromStorage()
+  }, [loadFromStorage])
 
   const runGraph = useCallback(async () => {
     if (!apiKey) {
@@ -87,6 +98,32 @@ export default function App() {
     }
   }, [apiKey, nodes, edges, setIsRunning, updateNodeData])
 
+  const handleSave = () => {
+    saveProject(false)
+    alert('پروژه در مرورگر ذخیره شد')
+  }
+
+  const handleExport = () => {
+    saveProject(true)
+  }
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const project = await readProjectFile(file)
+      loadProject(project)
+      alert(`پروژه «${project.name}» بارگذاری شد`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'خطا در بارگذاری فایل')
+    }
+    e.target.value = ''
+  }
+
   const randomPos = () => ({
     x: 80 + Math.random() * 400,
     y: 80 + Math.random() * 300,
@@ -96,7 +133,26 @@ export default function App() {
     <div className="w-screen h-screen bg-[#111827] flex flex-col">
       <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
         <span className="text-white font-semibold text-lg shrink-0">GapGPT Canvas</span>
-        <span className="text-slate-500 text-xs shrink-0 hidden md:inline">v15</span>
+
+        <input
+          className="bg-transparent text-slate-300 text-sm border border-slate-700 rounded px-2 py-1 w-36 focus:outline-none focus:border-blue-500 shrink-0"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          title="نام پروژه"
+        />
+
+        <div className="flex gap-1 shrink-0">
+          <button onClick={handleSave} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">ذخیره</button>
+          <button onClick={handleExport} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">خروجی JSON</button>
+          <button onClick={handleImportClick} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">بارگذاری</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
 
         <div className="flex-1" />
 
@@ -105,7 +161,7 @@ export default function App() {
           placeholder="کلید API"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-40 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
+          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-36 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
         />
 
         <div className="flex gap-1.5 shrink-0">
