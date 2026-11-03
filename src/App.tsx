@@ -15,12 +15,15 @@ import { ConditionalNode } from './nodes/ConditionalNode'
 import { LoopNode } from './nodes/LoopNode'
 import { MemoryNode } from './nodes/MemoryNode'
 import { FileNode } from './nodes/FileNode'
+import { PromptNode } from './nodes/PromptNode'
+import { AppOutputNode } from './nodes/AppOutputNode'
 import { PropertiesPanel } from './components/PropertiesPanel'
 import { useCanvasStore } from './store/useCanvasStore'
 import { executeGraph, GraphCycleError } from './engine/graphEngine'
 import { readProjectFile } from './services/projectStorage'
 
 const nodeTypes: NodeTypes = {
+  prompt: PromptNode,
   text: TextNode,
   image: ImageNode,
   video: VideoNode,
@@ -29,9 +32,11 @@ const nodeTypes: NodeTypes = {
   loop: LoopNode,
   memory: MemoryNode,
   file: FileNode,
+  appOutput: AppOutputNode,
 }
 
 const NODE_COLORS: Record<string, string> = {
+  prompt: '#6366f1',
   text: '#3b82f6',
   image: '#8b5cf6',
   video: '#ec4899',
@@ -40,6 +45,7 @@ const NODE_COLORS: Record<string, string> = {
   loop: '#14b8a6',
   memory: '#6366f1',
   file: '#10b981',
+  appOutput: '#06b6d4',
 }
 
 export default function App() {
@@ -62,14 +68,17 @@ export default function App() {
     saveProject,
     loadProject,
     loadFromStorage,
+    setNodes,
+    setEdges,
   } = useCanvasStore()
 
   useEffect(() => {
-    loadFromStorage()
+    const loaded = loadFromStorage()
+    // if old project has no prompt node, keep it; user can «شروع تازه»
+    void loaded
   }, [loadFromStorage])
 
   const runGraph = useCallback(async () => {
-    // apiKey optional when server has HADI_API_KEY
     if (!nodes.length) {
       alert('نودی برای اجرا وجود ندارد')
       return
@@ -85,11 +94,8 @@ export default function App() {
         },
       })
     } catch (err) {
-      if (err instanceof GraphCycleError) {
-        alert(err.message)
-      } else {
-        alert(err instanceof Error ? err.message : 'خطا در اجرای گراف')
-      }
+      if (err instanceof GraphCycleError) alert(err.message)
+      else alert(err instanceof Error ? err.message : 'خطا در اجرای گراف')
     } finally {
       setIsRunning(false)
     }
@@ -116,6 +122,26 @@ export default function App() {
     e.target.value = ''
   }
 
+  const handleFresh = () => {
+    if (!confirm('بوم فعلی پاک شود و فقط پرامپت اصلی بماند؟')) return
+    localStorage.removeItem('hadi_canvas_project')
+    setNodes([
+      {
+        id: 'prompt',
+        type: 'prompt',
+        position: { x: 280, y: 40 },
+        data: {
+          label: 'پرامپت اصلی',
+          prompt: 'یک ماشین حساب ساده با ظاهر مدرن بساز',
+          models: ['gpt-4o', 'gpt-4o-mini'],
+          status: 'empty',
+        },
+      },
+    ])
+    setEdges([])
+    setSelectedNodeId(null)
+  }
+
   const randomPos = () => ({
     x: 80 + Math.random() * 400,
     y: 80 + Math.random() * 300,
@@ -137,6 +163,7 @@ export default function App() {
           <button onClick={handleSave} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">ذخیره</button>
           <button onClick={handleExport} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">خروجی JSON</button>
           <button onClick={handleImportClick} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">بارگذاری</button>
+          <button onClick={handleFresh} className="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1.5 rounded-lg">شروع تازه</button>
           <input ref={fileInputRef} type="file" accept=".json,.hadi.json,application/json" className="hidden" onChange={handleFileChange} />
         </div>
 
@@ -144,21 +171,19 @@ export default function App() {
 
         <input
           type="password"
-          placeholder="کلید API (اختیاری اگر سرور دارد)"
+          placeholder="کلید API"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-48 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
+          className="bg-slate-800 text-white text-sm rounded-lg px-3 py-1.5 w-40 border border-slate-700 focus:outline-none focus:border-blue-500 shrink-0"
         />
 
         <div className="flex gap-1.5 shrink-0">
+          <button onClick={() => addNode('prompt', randomPos())} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ پرامپت</button>
           <button onClick={() => addNode('text', randomPos())} className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ متن</button>
           <button onClick={() => addNode('image', randomPos())} className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ تصویر</button>
           <button onClick={() => addNode('video', randomPos())} className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ ویدیو</button>
           <button onClick={() => addNode('merge', randomPos())} className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ ادغام</button>
-          <button onClick={() => addNode('conditional', randomPos())} className="bg-orange-600 hover:bg-orange-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ شرطی</button>
-          <button onClick={() => addNode('loop', randomPos())} className="bg-teal-600 hover:bg-teal-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ حلقه</button>
-          <button onClick={() => addNode('memory', randomPos())} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ حافظه</button>
-          <button onClick={() => addNode('file', randomPos())} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ فایل</button>
+          <button onClick={() => addNode('appOutput', randomPos())} className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-2.5 py-1.5 rounded-lg">+ خروجی اپ</button>
         </div>
 
         <button
@@ -170,7 +195,6 @@ export default function App() {
         </button>
       </div>
 
-      {/* LTR shell so panel stays on the physical right */}
       <div className="flex-1 flex min-h-0" dir="ltr">
         <div className="flex-1 min-w-0">
           <ReactFlow
