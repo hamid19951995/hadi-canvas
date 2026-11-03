@@ -10,6 +10,12 @@ export interface CanvasNodeData {
   status: NodeStatus
   result?: string
   error?: string
+  condition?: string
+  iterations?: number
+  currentIteration?: number
+  keys?: string[]
+  mode?: 'input' | 'output'
+  fileName?: string
 }
 
 interface CanvasState {
@@ -68,6 +74,17 @@ const defaultEdges: Edge[] = [
 
 let nodeIdCounter = 5
 
+const NODE_LABELS: Record<string, string> = {
+  text: 'مدل متنی',
+  image: 'تولید تصویر',
+  video: 'تولید ویدیو',
+  merge: 'ادغام نتایج',
+  conditional: 'شرطی',
+  loop: 'حلقه',
+  memory: 'حافظه',
+  file: 'فایل',
+}
+
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: defaultNodes,
   edges: defaultEdges,
@@ -79,21 +96,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setEdges: (edges) => set({ edges }),
 
   onNodesChange: (changes) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    })
+    set({ nodes: applyNodeChanges(changes, get().nodes) })
   },
 
   onEdgesChange: (changes) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    })
+    set({ edges: applyEdgeChanges(changes, get().edges) })
   },
 
   onConnect: (connection) => {
-    set({
-      edges: addEdge({ ...connection, animated: true }, get().edges),
-    })
+    set({ edges: addEdge({ ...connection, animated: true }, get().edges) })
   },
 
   setSelectedNodeId: (id) => set({ selectedNodeId: id }),
@@ -121,22 +132,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addNode: (type, position) => {
     const id = String(nodeIdCounter++)
-    const labels: Record<string, string> = {
-      text: 'مدل متنی',
-      image: 'تولید تصویر',
-      video: 'تولید ویدیو',
-      merge: 'ادغام نتایج',
+    const baseData: Record<string, unknown> = {
+      label: NODE_LABELS[type] || type,
+      status: 'empty',
     }
+    if (type === 'text') {
+      baseData.model = 'gpt-4o'
+      baseData.prompt = ''
+    }
+    if (type === 'conditional') {
+      baseData.condition = 'شامل «بله» باشد'
+    }
+    if (type === 'loop') {
+      baseData.iterations = 3
+    }
+    if (type === 'file') {
+      baseData.mode = 'input'
+    }
+
     const newNode: Node = {
       id,
       type,
       position,
-      data: {
-        label: labels[type] || type,
-        status: 'empty',
-        model: type === 'text' ? 'gpt-4o' : undefined,
-        prompt: '',
-      },
+      data: baseData,
     }
     set({ nodes: [...get().nodes, newNode] })
   },
