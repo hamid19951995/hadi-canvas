@@ -13,10 +13,21 @@
 | ۱۴ | موتور اجرای گراف (DAG + موازی) | ✅ |
 | ۱۵ | Properties Panel | ✅ |
 | ۱۶ | ذخیره/بارگذاری پروژه | ✅ |
-| ۱۷ | بک‌اند محافظ API key | ⏳ |
+| **۱۷** | بک‌اند محافظ API key | ✅ |
 
 ## برند
 
 نام محصول: **Hadi**  
-فایل پروژه: `*.hadi.json`  
-کلید ذخیره: `hadi_canvas_project` / `hadi_api_key`
+ریپو: `hamid19951995/hadi-canvas`  
+فایل پروژه: `*.hadi.json`
+
+## اجرای امن API
+
+```bash
+# ترمینال ۱ — پروکسی
+set HADI_API_KEY=your_key
+npm run dev:proxy
+
+# ترمینال ۲ — فرانت
+npm run dev
+```
