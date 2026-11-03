@@ -4,34 +4,29 @@
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
-| ۰۰–۰۸ | Cover تا Empty State & Onboarding | ✅ |
-| ۰۹ | Tablet & Responsive | ✅ |
-| ۱۰ | Advanced Nodes | ✅ |
-| ۱۱ | Design Tokens | ✅ |
-| ۱۲ | Interactive Prototype | ✅ |
-| ۱۳ | Handoff | ✅ |
+| ۰۰–۱۳ | Design تا Handoff | ✅ |
 
 ## فازهای توسعه
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
-| **۱۴** | موتور اجرای گراف (DAG + موازی) | ✅ |
-| ۱۵ | Properties Panel | ⏳ |
+| ۱۴ | موتور اجرای گراف (DAG + موازی) | ✅ |
+| **۱۵** | Properties Panel | ✅ |
 | ۱۶ | ذخیره/بارگذاری پروژه | ⏳ |
 | ۱۷ | بک‌اند محافظ API key | ⏳ |
 
-جزئیات موتور: [graph-engine.md](./graph-engine.md)  
-Handoff: [handoff.md](./handoff.md)
+## Properties Panel (فاز ۱۵)
 
-## نودهای پیاده‌شده
+- فایل: `src/components/PropertiesPanel.tsx`
+- عرض: 300px (مطابق token `--properties-width`)
+- با انتخاب نود باز می‌شود؛ کلیک روی بوم آن را خالی می‌کند
+- فیلدها بر اساس نوع نود:
+  - متن: مدل + پرامپت
+  - شرطی: شرط
+  - حلقه: تعداد تکرار
+  - فایل: حالت + نام فایل
+  - همه: عنوان، وضعیت، پیش‌نمایش خروجی
 
-| نوع | کامپوننت | اجرا در موتور |
-|-----|----------|----------------|
-| متن | TextNode | GapGPT API |
-| تصویر | ImageNode | placeholder |
-| ویدیو | VideoNode | placeholder |
-| ادغام | MergeNode | الحاق ورودی‌ها |
-| شرطی | ConditionalNode | TRUE/FALSE |
-| حلقه | LoopNode | تکرار محلی |
-| حافظه | MemoryNode | ذخیره context |
-| فایل | FileNode | خروجی نام‌دار |
+## نودها
+
+Text · Image · Video · Merge · Conditional · Loop · Memory · File
