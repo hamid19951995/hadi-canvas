@@ -15,6 +15,7 @@ import { ConditionalNode } from './nodes/ConditionalNode'
 import { LoopNode } from './nodes/LoopNode'
 import { MemoryNode } from './nodes/MemoryNode'
 import { FileNode } from './nodes/FileNode'
+import { PropertiesPanel } from './components/PropertiesPanel'
 import { useCanvasStore } from './store/useCanvasStore'
 import { executeGraph, GraphCycleError } from './engine/graphEngine'
 
@@ -95,7 +96,7 @@ export default function App() {
     <div className="w-screen h-screen bg-[#111827] flex flex-col">
       <div className="h-14 bg-[#0f172a] border-b border-slate-800 flex items-center px-3 gap-2 shrink-0 overflow-x-auto">
         <span className="text-white font-semibold text-lg shrink-0">GapGPT Canvas</span>
-        <span className="text-slate-500 text-xs shrink-0 hidden md:inline">موتور گراف v14</span>
+        <span className="text-slate-500 text-xs shrink-0 hidden md:inline">v15</span>
 
         <div className="flex-1" />
 
@@ -127,25 +128,30 @@ export default function App() {
         </button>
       </div>
 
-      <div className="flex-1">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-          nodeTypes={nodeTypes}
-          fitView
-          className="bg-[#111827]"
-        >
-          <Background color="#334155" gap={20} />
-          <Controls />
-          <MiniMap
-            nodeColor={(n) => NODE_COLORS[n.type || 'text'] || '#3b82f6'}
-            maskColor="rgba(0,0,0,0.6)"
-          />
-        </ReactFlow>
+      <div className="flex-1 flex min-h-0">
+        <div className="flex-1 min-w-0">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+            onPaneClick={() => setSelectedNodeId(null)}
+            nodeTypes={nodeTypes}
+            fitView
+            className="bg-[#111827]"
+          >
+            <Background color="#334155" gap={20} />
+            <Controls />
+            <MiniMap
+              nodeColor={(n) => NODE_COLORS[n.type || 'text'] || '#3b82f6'}
+              maskColor="rgba(0,0,0,0.6)"
+            />
+          </ReactFlow>
+        </div>
+
+        <PropertiesPanel />
       </div>
     </div>
   )
