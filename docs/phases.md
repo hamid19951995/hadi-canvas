@@ -6,9 +6,9 @@
 |-----|------|-------|
 | ۰۰–۰۸ | Cover تا Empty State & Onboarding | ✅ |
 | ۰۹ | Tablet & Responsive | ✅ |
-| **۱۰** | Advanced Nodes | ✅ |
-| ۱۱ | Design Tokens | ⏳ |
-| ۱۲ | Interactive Prototype | ⏳ |
+| ۱۰ | Advanced Nodes | ✅ |
+| ۱۱ | Design Tokens | ✅ |
+| **۱۲** | Interactive Prototype | ✅ |
 | ۱۳ | Handoff | ⏳ |
 
 ## نودهای پیاده‌شده در کد
@@ -29,6 +29,8 @@
 - ✅ راه‌اندازی React + XYFlow + Zustand
 - ✅ نودهای پایه و پیشرفته
 - ✅ اتصال به GapGPT API
+- ✅ Design Tokens
+- ✅ Interactive Prototype (Figma)
 - ⏳ موتور اجرای گراف (DAG + موازی)
 - ⏳ Properties Panel
 - ⏳ ذخیره/بارگذاری پروژه
