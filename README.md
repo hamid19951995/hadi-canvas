@@ -6,12 +6,15 @@ Hadi یک بوم نودبیس است برای کار موازی با چندین 
 
 > اتصال مدل‌ها از طریق API سازگار با OpenAI (مثلاً `api.gapgpt.app`) انجام می‌شود؛ نام محصول **Hadi** است.
 
+**ریپو:** https://github.com/hamid19951995/hadi
+
 ---
 
 ## لینک‌ها
 
 | منبع | آدرس |
 |------|------|
+| **GitHub** | https://github.com/hamid19951995/hadi |
 | **Figma** | [Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
 | **Canva** | [پرزنتیشن](https://canva.link/0rmc00upjb16qo8) |
 | **Handoff** | [docs/handoff.md](./docs/handoff.md) |
@@ -21,6 +24,8 @@ Hadi یک بوم نودبیس است برای کار موازی با چندین 
 ## شروع سریع
 
 ```bash
+git clone https://github.com/hamid19951995/hadi.git
+cd hadi
 npm install
 npm run dev
 ```
