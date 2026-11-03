@@ -21,11 +21,12 @@
 
 ## لینک‌های مرتبط
 
-| سرویس | لینک / وضعیت |
-|-------|-------------|
-| **Figma Design** | [طراحی UI/UX](https://www.figma.com/design/GjuH4saP1RX4JB85zPR8Y1) |
-| **GitHub Repo** | این ریپازیتوری |
-| **Canva** | مستندات و پرزنتیشن‌ها (به‌زودی) |
+| سرویس | لینک |
+|-------|------|
+| **Figma (جدید)** | [GapGPT Node Canvas - Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
+| **Figma (قبلی)** | [طراحی اولیه](https://www.figma.com/design/GjuH4saP1RX4JB85zPR8Y1) |
+| **GitHub** | این ریپازیتوری |
+| **Canva Presentation** | [پرزنتیشن معرفی پروژه](https://canva.link/0rmc00upjb16qo8) |
 
 ---
 
@@ -33,58 +34,55 @@
 
 | فاز | عنوان | وضعیت |
 |-----|------|-------|
-| ۰۰ | Cover | ✅ انجام شد |
-| ۰۱ | Desktop App Layout | ✅ انجام شد |
-| ۰۲ | Sample Nodes & Connections | ✅ انجام شد |
-| ۰۳ | Sidebar & Actions | ✅ انجام شد |
-| ۰۴ | Properties Panel | ✅ انجام شد |
-| ۰۵ | Components & Design System | ✅ انجام شد |
-| ۰۶ | بهبود کانکتورها و جریان داده | ✅ انجام شد |
-| ۰۷ | حالت‌های مختلف نود (Running / Success / Error / Empty) | ✅ انجام شد |
-| ۰۸ | Empty State + Onboarding | 🔄 در حال انجام |
+| ۰۰–۰۷ | Cover تا Node States | ✅ |
+| **۰۸** | Empty State + Onboarding + Quick Start | ✅ انجام شد |
 | ۰۹ | نسخه تبلت / ریسپانسیو | ⏳ |
-| ۱۰ | نودهای پیشرفته (شرطی، حلقه، حافظه، فایل) | ⏳ |
-| ۱۱ | Design Tokens + تایپوگرافی + Spacing | ⏳ |
-| ۱۲ | پروتوتایپ تعاملی (Prototype) | ⏳ |
-| ۱۳ | مستندسازی و Handoff برای توسعه | ⏳ |
+| ۱۰ | نودهای پیشرفته | ⏳ |
+| ۱۱ | Design Tokens | ⏳ |
+| ۱۲ | پروتوتایپ تعاملی | ⏳ |
+| ۱۳ | Handoff | ⏳ |
 
 ---
 
-## ساختار پیشنهادی پروژه (کد)
+## شروع سریع (کد)
 
-```
-gapgpt-node-canvas/
-├── apps/
-│   ├── web/                 # فرانت‌اند (React + React Flow)
-│   └── api/                 # بک‌اند (Node.js / Python)
-├── packages/
-│   ├── ui/                  # کامپوننت‌های مشترک
-│   ├── nodes/               # تعریف انواع نودها
-│   └── engine/              # موتور اجرای گراف (DAG)
-├── docs/
-│   ├── design/              # لینک و اسکرین‌شات‌های Figma
-│   └── architecture/        # معماری سیستم
-└── README.md
+```bash
+npm install
+npm run dev
 ```
 
+پروژه روی `http://localhost:5173` اجرا می‌شود.
+
+### ساختار فعلی کد
+
+```
+src/
+├── main.tsx
+├── App.tsx              # بوم اصلی با React Flow
+├── index.css
+└── nodes/
+    ├── TextNode.tsx     # نود متنی با حالت‌ها
+    └── ImageNode.tsx    # نود تصویر
+```
+
 ---
 
-## تکنولوژی‌های پیشنهادی
+## تکنولوژی‌ها
 
-- **Frontend**: React + TypeScript + React Flow (یا XYFlow)
-- **Backend**: Node.js / NestJS یا Python (FastAPI)
-- **State**: Zustand یا Redux Toolkit
-- **Realtime**: WebSocket برای اجرای موازی
-- **AI Integration**: APIهای GapGPT + مدل‌های دیگر
-- **Database**: PostgreSQL + Redis (برای صف اجرا)
+- React 18 + TypeScript
+- XYFlow (React Flow) برای گراف
+- Zustand (آماده برای state)
+- Tailwind CSS
+- Vite
 
 ---
 
-## وضعیت فعلی
+## وضعیت فعلی (۳ نوامبر ۲۰۲۶)
 
-- طراحی UI در Figma تا فاز ۷ کامل شده
-- ریپازیتوری جدید ایجاد شد
-- فازهای بعدی طراحی و سپس پیاده‌سازی کد شروع خواهد شد
+- ✅ ریپازیتوری ایجاد و اسکلت فرانت‌اند آماده
+- ✅ فاز ۸ طراحی (Empty State + Onboarding) در Figma جدید
+- ✅ پرزنتیشن Canva آماده
+- 🔄 ادامه فازهای طراحی و توسعه نودها
 
 ---
 
