@@ -1,8 +1,10 @@
-# GapGPT Node Canvas
+# Hadi
 
-**Visual Node-based Multi-Model AI Canvas for GapGPT**
+**محیط گراف‌محور چندمدلی هوش مصنوعی**
 
-محیط گراف‌محور برای کار موازی با چندین مدل هوش مصنوعی، تولید تصویر/ویدیو و ساخت پروژه‌های متصل.
+Hadi یک بوم نودبیس است برای کار موازی با چندین مدل، تولید تصویر/ویدیو و ساخت پروژه‌های متصل.
+
+> اتصال مدل‌ها از طریق API سازگار با OpenAI (مثلاً `api.gapgpt.app`) انجام می‌شود؛ نام محصول **Hadi** است.
 
 ---
 
@@ -13,20 +15,6 @@
 | **Figma** | [Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
 | **Canva** | [پرزنتیشن](https://canva.link/0rmc00upjb16qo8) |
 | **Handoff** | [docs/handoff.md](./docs/handoff.md) |
-| **GapGPT API** | [Quickstart](https://gapgpt.app/platform-v2/docs/quickstart) |
-
----
-
-## فازها (همه کامل شدند)
-
-| فاز | عنوان | وضعیت |
-|-----|------|-------|
-| ۰۰–۰۸ | Layout تا Empty State & Onboarding | ✅ |
-| ۰۹ | Tablet & Responsive | ✅ |
-| ۱۰ | Advanced Nodes | ✅ |
-| ۱۱ | Design Tokens | ✅ |
-| ۱۲ | Interactive Prototype | ✅ |
-| ۱۳ | Handoff | ✅ |
 
 ---
 
@@ -37,7 +25,7 @@ npm install
 npm run dev
 ```
 
-کلید API را از [پنل GapGPT](https://gapgpt.app/platform-v2/docs/quickstart) بگیرید و در نوار بالای اپ وارد کنید.
+کلید API را در نوار بالای اپ وارد کنید.
 
 ---
 
@@ -48,26 +36,26 @@ src/
 ├── App.tsx
 ├── nodes/          # Text, Image, Video, Merge, Conditional, Loop, Memory, File
 ├── store/          # Zustand
-├── services/       # GapGPT API
-└── styles/         # Design tokens (CSS + TS)
+├── engine/         # DAG execution
+├── services/       # API + project storage
+└── styles/         # Design tokens
 ```
 
 ## قابلیت‌ها
 
 - ۸ نوع نود با حالت empty / running / success / error
-- Zustand برای state
-- اتصال واقعی به GapGPT (`/v1/chat/completions`)
+- موتور اجرای گراف (موازی + توپولوژیک)
+- Properties Panel
+- ذخیره / بارگذاری پروژه (localStorage + فایل `.hadi.json`)
 - Design Tokens یکپارچه با Tailwind
-- Prototype تعاملی در Figma
 
 ## مستندات
 
-- [Handoff برای توسعه‌دهنده](./docs/handoff.md)
+- [Handoff](./docs/handoff.md)
+- [Graph Engine](./docs/graph-engine.md)
 - [Design Tokens](./docs/design-tokens.md)
-- [Prototype](./docs/prototype.md)
 - [Phases](./docs/phases.md)
-- [Architecture](./docs/architecture.md)
 
 ---
 
-ساخته‌شده با همکاری Grok | xAI
+Hadi
