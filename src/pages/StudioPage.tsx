@@ -296,7 +296,13 @@ export function StudioPage() {
     return [...map.values()]
   }, [project?.nodes, project?.updatedAt])
 
-  if (!project) return null
+  if (!project) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0b1220] text-slate-300" dir="rtl">
+        پروژه‌ای باز نیست. به فهرست پروژه‌ها برگردید.
+      </div>
+    )
+  }
 
   const finalNode = project.nodes.find((n) => n.data.kind === 'final')
 

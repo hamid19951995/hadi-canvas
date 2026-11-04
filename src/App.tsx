@@ -8,6 +8,8 @@ export default function App() {
     return <OAuthCallbackPage />
   }
   const screen = useStore((s) => s.screen)
-  if (screen === 'projects') return <ProjectsPage />
-  return <StudioPage />
+  const project = useStore((s) => s.project)
+  // فقط وقتی پروژه واقعاً باز است استودیو را نشان بده
+  if (screen === 'studio' && project) return <StudioPage />
+  return <ProjectsPage />
 }

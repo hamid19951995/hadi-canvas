@@ -49,3 +49,7 @@ export async function exchangeCanvaCode(code: string): Promise<{ access_token: s
   sessionStorage.removeItem('hadi_canva_verifier')
   return j
 }
+
+export function isCanvaOAuthConfigured() {
+  return Boolean(import.meta.env.VITE_CANVA_CLIENT_ID || import.meta.env.VITE_OAUTH_API)
+}

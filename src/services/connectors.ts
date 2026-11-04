@@ -289,3 +289,24 @@ export function resolveLlmApiKey(): { provider: ConnectorId; key: string } | nul
   }
   return null
 }
+
+/** ---- backward-compatible aliases used by store / APIs ---- */
+export function getStoredKey(id: ConnectorId): string | null {
+  return getApiKey(id)
+}
+
+export function isUsable(id: ConnectorId): boolean {
+  const st = loadConnectorStates().find((s) => s.id === id)
+  return st?.status === 'connected' && Boolean(getApiKey(id) || st.hint)
+}
+
+export function connectWithOAuthToken(id: ConnectorId, token: string, hint?: string): ConnectorState {
+  setApiKey(id, token)
+  const states = upsertState({
+    id,
+    status: 'connected',
+    hint: hint || '…' + token.slice(-4),
+    lastCheckedAt: new Date().toISOString(),
+  })
+  return states.find((s) => s.id === id)!
+}

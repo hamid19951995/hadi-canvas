@@ -596,7 +596,7 @@ export const useStore = create<State>((set, get) => ({
       .filter(Boolean)
       .join('\n\n')
     try {
-      const key = resolveLlmApiKey().key || get().apiKey
+      const key = resolveLlmApiKey()?.key || get().apiKey
       let result = ''
       if (node.data.kind === 'prompt') result = node.data.prompt
       else if (node.data.kind === 'merge' || node.data.kind === 'final') result = incoming || node.data.prompt || '(خالی)'

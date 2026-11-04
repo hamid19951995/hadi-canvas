@@ -17,6 +17,7 @@ function label(kind: NodeKind): string {
     loop: 'حلقه',
     memory: 'حافظه',
     agent: 'ایجنت',
+    figma: 'Figma',
   }
   return m[kind]
 }
