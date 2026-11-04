@@ -1,66 +1,50 @@
-# Hadi
+# hadi-canvas
 
-**محیط گراف‌محور چندمدلی هوش مصنوعی**
+**استودیوی گراف‌محور** برای تبدیل ایده به خروجی قابل بررسی (متن، کد، تصویر، Figma).
 
-Hadi یک بوم نودبیس است برای کار موازی با چندین مدل، تولید تصویر/ویدیو و ساخت پروژه‌های متصل.
+نسخه **2.2.0**
 
-> اتصال مدل‌ها از طریق API سازگار با OpenAI (مثلاً `api.gapgpt.app`) انجام می‌شود؛ نام محصول **Hadi** است.
-
-**ریپو:** https://github.com/hamid19951995/hadi-canvas
-
----
-
-## لینک‌ها
-
-| منبع | آدرس |
-|------|------|
-| **GitHub** | https://github.com/hamid19951995/hadi-canvas |
-| **Figma** | [Design System](https://www.figma.com/design/6TtVm7Y3O7SddMj77Wguys) |
-| **Canva** | [پرزنتیشن](https://canva.link/0rmc00upjb16qo8) |
-| **Handoff** | [docs/handoff.md](./docs/handoff.md) |
-
----
-
-## شروع سریع
+## اجرا
 
 ```bash
-git clone https://github.com/hamid19951995/hadi-canvas.git
-cd hadi-canvas
 npm install
 npm run dev
 ```
 
-کلید API را در نوار بالای اپ وارد کنید.
+باز کنید: http://localhost:5173
 
----
+### OAuth (اختیاری)
+
+```bash
+cp .env.example .env
+# Client ID/Secret را پر کنید
+npm run oauth    # ترمینال جدا — پورت 8787
+npm run dev
+```
+
+جزئیات: [docs/DEPLOY.md](docs/DEPLOY.md)
+
+## هسته محصول
+
+1. ساخت / باز کردن پروژه  
+2. افزودن گره و اتصال **typed**  
+3. بررسی پیش از اجرا (preflight)  
+4. اجرای موازی موجی  
+5. تاریخچه، نسخه، مقایسه، خروجی / انتشار با تأیید  
+
+الگوهای آماده: **مدار** · برنامه ایجنت · بازبینی شرطی · بسته محتوا · Figma→کد
 
 ## ساختار
 
-```
-src/
-├── App.tsx
-├── nodes/          # Text, Image, Video, Merge, Conditional, Loop, Memory, File
-├── store/          # Zustand
-├── engine/         # DAG execution
-├── services/       # API + project storage
-└── styles/         # Design tokens
-```
+→ [docs/STRUCTURE.md](docs/STRUCTURE.md)
 
-## قابلیت‌ها
+## چک‌لیست تست
 
-- ۸ نوع نود با حالت empty / running / success / error
-- موتور اجرای گراف (موازی + توپولوژیک)
-- Properties Panel
-- ذخیره / بارگذاری پروژه (localStorage + فایل `.hadi.json`)
-- Design Tokens یکپارچه با Tailwind
+→ [docs/SMOKE.md](docs/SMOKE.md)
 
-## مستندات
+## اصل‌ها
 
-- [Handoff](./docs/handoff.md)
-- [Graph Engine](./docs/graph-engine.md)
-- [Design Tokens](./docs/design-tokens.md)
-- [Phases](./docs/phases.md)
-
----
-
-Hadi
+- اتصال = داده واقعی + وابستگی اجرا  
+- سهمیه از **حساب خود کاربر**  
+- ذخیره پروژه ≠ دریافت محلی ≠ انتشار  
+- قابلیت آماده‌نشده صریحاً «به‌زودی / نیازمند اتصال» است  

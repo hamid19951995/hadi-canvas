@@ -1,0 +1,35 @@
+# Optional: listen for hadi_command repository_dispatch
+name: hadi-command
+
+on:
+  repository_dispatch:
+    types: [hadi_command]
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  acknowledge:
+    if: >
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'hadi-command'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log payload
+        run: |
+          echo "event: ${{ github.event_name }}"
+          echo "command: ${{ github.event.client_payload.command_id }}"
+          echo "action: ${{ github.event.client_payload.action }}"
+
+      - name: Comment on issue (if any)
+        if: github.event.client_payload.issue != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.client_payload?.issue
+            if (!issue) return
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(issue),
+              body: '🤖 hadi Actions: command received and acknowledged.'
+            })
