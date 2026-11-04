@@ -192,10 +192,63 @@ export function StudioPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges)
 
+  const structureKey = useMemo(() => {
+    if (!project) return ''
+    return (
+      project.nodes.map((n) => n.id).join(',') +
+      '|' +
+      project.edges.map((e) => e.id).join(',')
+    )
+  }, [project?.nodes, project?.edges])
+
+  // تعویض پروژه یا تغییر ساختار (افزودن/حذف گره یا یال)
   useEffect(() => {
-    setNodes(rfNodes)
-    setEdges(rfEdges)
-  }, [project?.id, project?.updatedAt])
+    if (!project) return
+    setNodes((current) => {
+      const pos = new Map(current.map((n) => [n.id, n.position]))
+      return project.nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: pos.get(n.id) || n.position,
+        data: {
+          ...n.data,
+          groupId: n.groupId,
+          groupLabel: n.groupLabel,
+        },
+      }))
+    })
+    setEdges(
+      project.edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
+        selectable: true,
+        style: { stroke: e.valid ? '#8b5cf6' : '#ef4444', strokeWidth: 2 },
+        animated: !e.valid,
+      })),
+    )
+  }, [project?.id, structureKey])
+
+  // به‌روزرسانی داده (پرامپت/وضعیت/نتیجه) بدون بازسازی کل گراف
+  useEffect(() => {
+    if (!project) return
+    setNodes((current) =>
+      current.map((n) => {
+        const src = project.nodes.find((x) => x.id === n.id)
+        if (!src) return n
+        return {
+          ...n,
+          data: {
+            ...src.data,
+            groupId: src.groupId,
+            groupLabel: src.groupLabel,
+          },
+        }
+      }),
+    )
+  }, [project?.updatedAt])
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -208,14 +261,18 @@ export function StudioPage() {
 
   const onNodeDragStop = useCallback(
     (_: unknown, _n: Node, all: Node[]) => {
-      if (!project) return
-      const mapped = all.map((n) => {
-        const prev = project.nodes.find((x) => x.id === n.id)!
-        return { ...prev, position: n.position }
-      })
+      // از state تازه استفاده کن تا گره تازه‌اضافه‌شده پاک نشود
+      const proj = useStore.getState().project
+      if (!proj) return
+      const byId = new Map(all.map((n) => [n.id, n.position]))
+      const mapped = proj.nodes.map((prev) => ({
+        ...prev,
+        position: byId.get(prev.id) || prev.position,
+      }))
+      // اگر React Flow گرهی داشت که در store نیست، نگه ندار — store منبع حقیقت است
       setNodesStore(mapped)
     },
-    [project, setNodesStore]
+    [setNodesStore],
   )
 
   const selected = project?.nodes.find((n) => n.id === selectedId)

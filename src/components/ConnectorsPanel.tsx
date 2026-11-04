@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   CONNECTOR_CATALOG,
+  connectMcp,
   connectWithApiKey,
   disconnectConnector,
+  getMcpServerUrl,
   loadConnectorStates,
+  type ConnectorDef,
   type ConnectorId,
   type ConnectorState,
 } from '../services/connectors'
@@ -11,22 +14,59 @@ import {
   checkOAuthServer,
   isGithubOAuthConfigured,
   startGithubOAuth,
-  githubAuthorizeUrlDirect,
 } from '../services/githubOAuth'
 import { validateGithubConnection } from '../services/githubApi'
+import { isFigmaOAuthConfigured, startFigmaOAuth } from '../services/figmaOAuth'
+import { isCanvaOAuthConfigured, startCanvaOAuth } from '../services/canvaOAuth'
+
+const categoryOrder = ['productivity', 'models', 'developer', 'design', 'custom'] as const
 
 export function ConnectorsPanel() {
   const [states, setStates] = useState<ConnectorState[]>([])
+  const [selectedId, setSelectedId] = useState<ConnectorId | null>('figma')
   const [keys, setKeys] = useState<Record<string, string>>({})
+  const [serverUrls, setServerUrls] = useState<Record<string, string>>({})
   const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [q, setQ] = useState('')
 
   const refresh = () => setStates(loadConnectorStates())
 
   useEffect(() => {
     refresh()
+    const init: Record<string, string> = {}
+    for (const c of CONNECTOR_CATALOG) {
+      init[c.id] = getMcpServerUrl(c.id, c.serverUrl)
+    }
+    setServerUrls(init)
   }, [])
 
   const statusOf = (id: ConnectorId) => states.find((s) => s.id === id)
+  const selected = CONNECTOR_CATALOG.find((c) => c.id === selectedId) || CONNECTOR_CATALOG[0]
+  const st = statusOf(selected.id)
+
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase()
+    return CONNECTOR_CATALOG.filter(
+      (c) =>
+        !query ||
+        c.label.toLowerCase().includes(query) ||
+        c.description.toLowerCase().includes(query) ||
+        c.categoryLabel.toLowerCase().includes(query),
+    )
+  }, [q])
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, ConnectorDef[]>()
+    for (const c of filtered) {
+      const list = map.get(c.category) || []
+      list.push(c)
+      map.set(c.category, list)
+    }
+    return categoryOrder
+      .filter((k) => map.has(k))
+      .map((k) => ({ key: k, label: map.get(k)![0].categoryLabel, items: map.get(k)! }))
+  }, [filtered])
 
   const statusLabel = (s?: ConnectorState) => {
     if (!s) return 'قطع'
@@ -37,273 +77,209 @@ export function ConnectorsPanel() {
   }
 
   const statusClass = (s?: ConnectorState) => {
-    if (s?.status === 'connected') return 'text-emerald-400'
-    if (s?.status === 'expired') return 'text-amber-400'
-    if (s?.status === 'error') return 'text-red-400'
-    return 'text-slate-500'
+    if (s?.status === 'connected') return 'bg-emerald-500/15 text-emerald-400'
+    if (s?.status === 'expired') return 'bg-amber-500/15 text-amber-400'
+    if (s?.status === 'error') return 'bg-red-500/15 text-red-400'
+    return 'bg-slate-800 text-slate-400'
+  }
+
+  const onConnect = async () => {
+    setBusy(true)
+    setMsg('')
+    try {
+      const c = selected
+      if (c.auth === 'api_key') {
+        const key = keys[c.id] || ''
+        const next = connectWithApiKey(c.id, key)
+        refresh()
+        setMsg(next.status === 'connected' ? `${c.label} متصل شد.` : next.message || 'خطا')
+        return
+      }
+      if (c.id === 'github') {
+        const ok = isGithubOAuthConfigured() && (await checkOAuthServer())
+        if (!ok) {
+          setMsg('سرور OAuth یا Client ID تنظیم نشده (npm run oauth + .env)')
+          return
+        }
+        startGithubOAuth()
+        return
+      }
+      if (c.id === 'figma' && c.auth === 'mcp') {
+        // Prefer MCP URL connect; if OAuth configured, offer both via token field optional
+        const url = serverUrls[c.id] || c.serverUrl
+        const token = keys[c.id]
+        if (isFigmaOAuthConfigured() && !token) {
+          startFigmaOAuth()
+          return
+        }
+        const next = await connectMcp(c.id, url, token)
+        refresh()
+        setMsg(
+          next.status === 'connected'
+            ? `Figma به ${url} متصل شد.`
+            : next.message || 'خطا در اتصال',
+        )
+        return
+      }
+      if (c.id === 'canva') {
+        if (!isCanvaOAuthConfigured()) {
+          setMsg('CANVA_CLIENT_ID در .env تنظیم نشده')
+          return
+        }
+        await startCanvaOAuth()
+        return
+      }
+      if (c.auth === 'mcp') {
+        const url = serverUrls[c.id] || c.serverUrl
+        const next = await connectMcp(c.id, url, keys[c.id])
+        refresh()
+        setMsg(next.status === 'connected' ? `متصل به ${url}` : next.message || 'خطا')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onDisconnect = () => {
+    disconnectConnector(selected.id)
+    refresh()
+    setMsg(`${selected.label} قطع شد.`)
   }
 
   return (
-    <div dir="rtl">
-      <h1 className="mb-2 text-lg text-white">اتصال‌دهنده‌ها</h1>
-      <p className="mb-4 text-xs text-slate-400">
-        هر اتصال سهمیه/دسترسی حساب شماست. کلید در مرورگر شما می‌ماند و به سرور hadi-canvas فرستاده نمی‌شود مگر برای
-        درخواست مستقیم به همان سرویس.
-      </p>
-      {msg && <p className="mb-3 text-xs text-violet-300">{msg}</p>}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {CONNECTOR_CATALOG.map((c) => {
-          const st = statusOf(c.id)
-          return (
-            <div key={c.id} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-sm font-medium text-white">{c.label}</div>
-                  <div className="mt-0.5 text-[11px] text-slate-400">{c.description}</div>
-                </div>
-                <span className={`text-[11px] font-medium ${statusClass(st)}`}>{statusLabel(st)}</span>
+    <div className="flex min-h-0 flex-1 gap-0" dir="rtl">
+      {/* List */}
+      <div className="flex w-[320px] shrink-0 flex-col border-l border-slate-800 bg-slate-950">
+        <div className="border-b border-slate-800 p-3">
+          <h1 className="text-sm font-semibold text-white">پلاگین‌ها و اتصال‌دهنده‌ها</h1>
+          <p className="mt-1 text-[11px] text-slate-500">مثل MCP: Server URL + Connect</p>
+          <input
+            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200"
+            placeholder="جستجو…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {grouped.map((g) => (
+            <div key={g.key} className="mb-3">
+              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                {g.label}
               </div>
-              <p className="mt-2 text-[10px] text-slate-500">{c.scopesNote}</p>
-              {st?.hint && st.status === 'connected' && (
-                <p className="mt-1 text-[10px] text-slate-500">نشانه کلید: {st.hint}</p>
-              )}
-              {st?.message && <p className="mt-1 text-[10px] text-amber-300">{st.message}</p>}
-
-              {c.auth === 'api_key' ? (
-                <div className="mt-3 space-y-2">
-                  {st?.status !== 'connected' && (
-                    <>
-                      <input
-                        type="password"
-                        placeholder="کلید API"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs"
-                        value={keys[c.id] || ''}
-                        onChange={(e) => setKeys((k) => ({ ...k, [c.id]: e.target.value }))}
-                      />
-                      <button
-                        type="button"
-                        className="w-full rounded-lg bg-violet-600 py-1.5 text-xs text-white"
-                        onClick={() => {
-                          const r = connectWithApiKey(c.id, keys[c.id] || '')
-                          setMsg(r.status === 'connected' ? `${c.label} متصل شد` : r.message || 'خطا')
-                          refresh()
-                        }}
-                      >
-                        اتصال
-                      </button>
-                    </>
-                  )}
-                  {st?.status === 'connected' && (
-                    <button
-                      type="button"
-                      className="w-full rounded-lg border border-slate-600 py-1.5 text-xs text-slate-300"
-                      onClick={() => {
-                        disconnectConnector(c.id)
-                        setMsg(`${c.label} قطع شد`)
-                        refresh()
-                      }}
-                    >
-                      قطع اتصال
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {c.id === 'github' ? (
-                    <>
-                      {st?.status === 'connected' ? (
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            className="w-full rounded-lg bg-slate-800 py-1.5 text-xs text-slate-200"
-                            onClick={async () => {
-                              try {
-                                const u = await validateGithubConnection()
-                                setMsg(`معتبر: @${u.login}`)
-                                refresh()
-                              } catch (e: unknown) {
-                                setMsg(e instanceof Error ? e.message : 'اعتبارسنجی ناموفق')
-                                refresh()
-                              }
-                            }}
-                          >
-                            بررسی حساب GitHub
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded-lg border border-slate-600 py-1.5 text-xs text-slate-300"
-                            onClick={() => {
-                              disconnectConnector(c.id)
-                              setMsg('GitHub قطع شد')
-                              refresh()
-                            }}
-                          >
-                            قطع اتصال
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="w-full rounded-lg bg-emerald-600 py-1.5 text-xs text-white"
-                          onClick={async () => {
-                            try {
-                              const health = await checkOAuthServer()
-                              if (!health.ok) {
-                                setMsg(health.error || 'سرور OAuth در دسترس نیست')
-                                return
-                              }
-                              if (!health.githubConfigured && !isGithubOAuthConfigured()) {
-                                setMsg(
-                                  'GITHUB_CLIENT_ID/SECRET را در .env بگذارید و npm run oauth را اجرا کنید. راهنما در README.'
-                                )
-                                return
-                              }
-                              try {
-                                sessionStorage.setItem('hadi_oauth_provider', 'github')
-                                const { authorizeUrl } = await startGithubOAuth()
-                                window.location.href = authorizeUrl
-                              } catch {
-                                const direct = githubAuthorizeUrlDirect()
-                                if (direct) window.location.href = direct
-                                else setMsg('پیکربندی OAuth ناقص است')
-                              }
-                            } catch (e: unknown) {
-                              setMsg(e instanceof Error ? e.message : 'خطای OAuth')
-                            }
-                          }}
-                        >
-                          ورود با GitHub (OAuth)
-                        </button>
-                      )}
-                      <p className="text-[10px] text-slate-500">
-                        نیاز به سرور محلی: <code className="text-slate-400">npm run oauth</code> + اپ OAuth در
-                        GitHub با callback{' '}
-                        <code className="text-slate-400">http://localhost:5173/oauth/callback</code>
-                      </p>
-                    </>
-                  ) : c.id === 'figma' ? (
-                    <>
-                      {st?.status === 'connected' ? (
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            className="w-full rounded-lg bg-slate-800 py-1.5 text-xs text-slate-200"
-                            onClick={async () => {
-                              try {
-                                const { validateFigmaConnection } = await import('../services/figmaApi')
-                                const me = await validateFigmaConnection()
-                                setMsg(`Figma: ${me.handle || me.email || me.id}`)
-                                refresh()
-                              } catch (e: unknown) {
-                                setMsg(e instanceof Error ? e.message : 'اعتبارسنجی Figma ناموفق')
-                              }
-                            }}
-                          >
-                            بررسی حساب Figma
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded-lg border border-slate-600 py-1.5 text-xs text-slate-300"
-                            onClick={() => {
-                              disconnectConnector(c.id)
-                              setMsg('Figma قطع شد')
-                              refresh()
-                            }}
-                          >
-                            قطع اتصال
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="w-full rounded-lg bg-emerald-600 py-1.5 text-xs text-white"
-                          onClick={async () => {
-                            try {
-                              const health = await checkOAuthServer()
-                              if (!health.ok) {
-                                setMsg(health.error || 'سرور OAuth در دسترس نیست')
-                                return
-                              }
-                              if (!(health as { figmaConfigured?: boolean }).figmaConfigured) {
-                                setMsg('FIGMA_CLIENT_ID/SECRET را در .env بگذارید و npm run oauth را اجرا کنید.')
-                                return
-                              }
-                              const { startFigmaOAuth } = await import('../services/figmaOAuth')
-                              const { authorizeUrl } = await startFigmaOAuth()
-                              window.location.href = authorizeUrl
-                            } catch (e: unknown) {
-                              setMsg(e instanceof Error ? e.message : 'خطای OAuth فigma')
-                            }
-                          }}
-                        >
-                          ورود با Figma (OAuth)
-                        </button>
-                      )}
-                      <p className="text-[10px] text-slate-500">
-                        در Figma → Settings → Apps یک OAuth app بسازید. Callback همان
-                        http://localhost:5173/oauth/callback
-                      </p>
-                    </>
-                  ) : c.id === 'canva' ? (
-                    <>
-                      {st?.status === 'connected' ? (
-                        <button
-                          type="button"
-                          className="w-full rounded-lg border border-slate-600 py-1.5 text-xs text-slate-300"
-                          onClick={() => {
-                            disconnectConnector(c.id)
-                            setMsg('Canva قطع شد')
-                            refresh()
-                          }}
-                        >
-                          قطع اتصال
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="w-full rounded-lg bg-emerald-600 py-1.5 text-xs text-white"
-                          onClick={async () => {
-                            try {
-                              const health = await checkOAuthServer()
-                              if (!health.ok) {
-                                setMsg(health.error || 'سرور OAuth در دسترس نیست')
-                                return
-                              }
-                              if (!(health as { canvaConfigured?: boolean }).canvaConfigured) {
-                                setMsg('CANVA_CLIENT_ID/SECRET را در .env بگذارید و npm run oauth را اجرا کنید.')
-                                return
-                              }
-                              const { startCanvaOAuth } = await import('../services/canvaOAuth')
-                              const { authorizeUrl } = await startCanvaOAuth()
-                              window.location.href = authorizeUrl
-                            } catch (e: unknown) {
-                              setMsg(e instanceof Error ? e.message : 'خطای OAuth Canva')
-                            }
-                          }}
-                        >
-                          ورود با Canva (OAuth)
-                        </button>
-                      )}
-                      <p className="text-[10px] text-slate-500">
-                        PKCE (S256) در کلاینت فعال است؛ code_verifier فقط در sessionStorage می‌ماند.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        disabled
-                        className="w-full cursor-not-allowed rounded-lg border border-slate-700 py-1.5 text-xs text-slate-500"
-                      >
-                        OAuth {c.label} (پشتیبانی نشده)
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
+              {g.items.map((c) => {
+                const s = statusOf(c.id)
+                const active = selected.id === c.id
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedId(c.id)}
+                    className={`mb-1 flex w-full items-center gap-2 rounded-xl px-2 py-2.5 text-right transition ${
+                      active ? 'bg-violet-600/20 ring-1 ring-violet-500/40' : 'hover:bg-slate-900'
+                    }`}
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-sm font-bold text-violet-300">
+                      {c.label.slice(0, 1)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-medium text-white">{c.label}</div>
+                      <div className="truncate text-[10px] text-slate-500">{c.categoryLabel}</div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] ${statusClass(s)}`}>
+                      {statusLabel(s)}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          )
-        })}
+          ))}
+        </div>
+      </div>
+
+      {/* Detail card — matches Figma Connect UI pattern */}
+      <div className="flex flex-1 items-start justify-center overflow-y-auto bg-slate-900/40 p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-xl">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-800 text-lg font-bold text-violet-300">
+                {selected.label.slice(0, 1)}
+              </div>
+              <div>
+                <div className="text-base font-semibold text-white">{selected.label}</div>
+                <div className="text-xs text-slate-500">{selected.categoryLabel}</div>
+              </div>
+            </div>
+            {st?.status === 'connected' ? (
+              <button
+                type="button"
+                onClick={onDisconnect}
+                className="rounded-full border border-slate-600 px-4 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+              >
+                قطع اتصال
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onConnect}
+                className="rounded-full bg-white px-4 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {busy ? '…' : 'Connect'}
+              </button>
+            )}
+          </div>
+
+          <p className="mb-5 text-sm leading-relaxed text-slate-400">{selected.description}</p>
+
+          <div className="mb-1 text-xs font-medium text-slate-500">Server URL</div>
+          <input
+            className="mb-4 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 font-mono text-xs text-slate-200"
+            value={serverUrls[selected.id] ?? selected.serverUrl}
+            onChange={(e) => setServerUrls((u) => ({ ...u, [selected.id]: e.target.value }))}
+            placeholder="https://mcp.example.com/mcp"
+            readOnly={selected.auth === 'api_key' && selected.id !== 'custom_mcp'}
+          />
+
+          {(selected.auth === 'api_key' || selected.auth === 'mcp') && (
+            <>
+              <div className="mb-1 text-xs font-medium text-slate-500">
+                {selected.auth === 'mcp' ? 'Token (اختیاری)' : 'API Key'}
+              </div>
+              <input
+                type="password"
+                className="mb-4 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200"
+                placeholder={selected.auth === 'mcp' ? 'در صورت نیاز' : 'کلید API'}
+                value={keys[selected.id] || ''}
+                onChange={(e) => setKeys((k) => ({ ...k, [selected.id]: e.target.value }))}
+              />
+            </>
+          )}
+
+          <p className="text-[11px] leading-relaxed text-slate-500">{selected.scopesNote}</p>
+          {selected.docsUrl && (
+            <a
+              href={selected.docsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-[11px] text-violet-400 hover:underline"
+            >
+              مستندات
+            </a>
+          )}
+
+          {st?.status === 'connected' && (
+            <div className="mt-4 rounded-xl border border-emerald-900/50 bg-emerald-950/30 px-3 py-2 text-[11px] text-emerald-300">
+              متصل{st.hint ? ` · ${st.hint}` : ''}
+              {st.serverUrl ? ` · ${st.serverUrl}` : ''}
+            </div>
+          )}
+          {msg && <p className="mt-3 text-xs text-violet-300">{msg}</p>}
+
+          <p className="mt-5 text-[10px] leading-relaxed text-slate-600">
+            Third-party connectors are not built or maintained by hadi-canvas host. Review permissions before
+            connecting. API keys stay in your browser unless you use the local OAuth helper.
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -319,10 +319,13 @@ export const useStore = create<State>((set, get) => ({
   addNode: (kind, pos) => {
     const project = get().project
     if (!project) return
+    get().pushUndo()
     const node = makeNode(kind, pos || { x: 240 + Math.random() * 80, y: 120 + Math.random() * 80 })
-    const next = touch({ ...project, nodes: [...project.nodes, node] })
+    // همیشه به لیست موجود اضافه شود؛ هرگز کل گراف جایگزین نشود
+    const nodes = Array.isArray(project.nodes) ? [...project.nodes, node] : [node]
+    const next = touch({ ...project, nodes })
     upsertProject(next)
-    set({ project: next, selectedId: node.id })
+    set({ project: next, selectedId: node.id, lastSavedAt: next.updatedAt })
   },
 
   updateNode: (id, patch) => {

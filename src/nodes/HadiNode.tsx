@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { NodeData } from '../domain/types'
 import { portsOf } from '../domain/types'
+import { useStore } from '../store/useStore'
 
 const statusColor: Record<string, string> = {
   idle: '#64748b',
@@ -26,21 +27,24 @@ function extractImageUrls(text?: string): string[] {
       low.includes('amazonaws')
     )
   })
-  // unique, max 4
   return [...new Set(imageLike)].slice(0, 4)
 }
 
-function HadiNodeComponent({ data, selected }: NodeProps & { data: NodeData & { groupLabel?: string; groupId?: string } }) {
+const EDITABLE = new Set(['prompt', 'text', 'image', 'code', 'agent', 'loop', 'condition', 'memory', 'figma'])
+
+function HadiNodeComponent({ id, data, selected }: NodeProps & { data: NodeData & { groupLabel?: string; groupId?: string } }) {
+  const updateNode = useStore((s) => s.updateNode)
   const ports = portsOf(data.kind)
   const ins = ports.filter((p) => p.direction === 'in')
   const outs = ports.filter((p) => p.direction === 'out')
   const images = useMemo(() => extractImageUrls(data.result), [data.result])
   const grouped = Boolean(data.groupId)
+  const canEditPrompt = EDITABLE.has(data.kind)
 
   return (
     <div
       dir="rtl"
-      className={`min-w-[200px] max-w-[260px] rounded-xl border bg-slate-900 shadow-lg ${
+      className={`min-w-[220px] max-w-[280px] rounded-xl border bg-slate-900 shadow-lg ${
         selected ? 'border-violet-500 ring-2 ring-violet-500/30' : grouped ? 'border-cyan-600/70' : 'border-slate-700'
       }`}
     >
@@ -59,6 +63,18 @@ function HadiNodeComponent({ data, selected }: NodeProps & { data: NodeData & { 
       </div>
       <div className="space-y-1.5 px-3 py-2 text-[11px] text-slate-400">
         {data.error && <p className="text-red-300">{data.error}</p>}
+        {canEditPrompt && (
+          <textarea
+            className="nodrag nowheel mb-1 h-16 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-200 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+            placeholder="پرامپت را اینجا بنویسید…"
+            value={data.prompt || ''}
+            rows={3}
+            onChange={(e) => updateNode(id, { prompt: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          />
+        )}
         {images.length > 0 && (
           <div className="grid grid-cols-2 gap-1">
             {images.map((src) => (
@@ -84,7 +100,7 @@ function HadiNodeComponent({ data, selected }: NodeProps & { data: NodeData & { 
         {data.result ? (
           <p className="line-clamp-3 whitespace-pre-wrap text-slate-300">{data.result}</p>
         ) : (
-          data.prompt && <p className="line-clamp-2 text-slate-500">{data.prompt}</p>
+          !canEditPrompt && data.prompt && <p className="line-clamp-2 text-slate-500">{data.prompt}</p>
         )}
       </div>
       {ins.map((p, i) => (
@@ -93,7 +109,7 @@ function HadiNodeComponent({ data, selected }: NodeProps & { data: NodeData & { 
           id={p.id}
           type="target"
           position={Position.Left}
-          style={{ top: 36 + i * 16 }}
+          style={{ top: 40 + i * 18 }}
           className="!h-2.5 !w-2.5 !border-slate-900 !bg-violet-400"
           title={p.label}
         />
@@ -104,7 +120,7 @@ function HadiNodeComponent({ data, selected }: NodeProps & { data: NodeData & { 
           id={p.id}
           type="source"
           position={Position.Right}
-          style={{ top: 36 + i * 16 }}
+          style={{ top: 40 + i * 18 }}
           className="!h-2.5 !w-2.5 !border-slate-900 !bg-emerald-400"
           title={p.label}
         />
