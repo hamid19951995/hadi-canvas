@@ -25,6 +25,10 @@ import { clearImageCache, listCached } from '../services/imageCache'
 import { extractImageUrls } from '../utils/extractImages'
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider'
 import type { NodeKind } from '../domain/types'
+import { UserMenu } from '../components/UserMenu'
+import { CodeLab } from '../components/CodeLab'
+import { getLlmBaseUrl, setLlmBaseUrl } from '../services/llm'
+import { CONNECTOR_CATALOG, getApiKey, connectWithApiKey, loadConnectorStates } from '../services/connectors'
 
 const nodeTypes = {
   prompt: HadiNode,
@@ -259,6 +263,24 @@ export function StudioPage() {
     [connect]
   )
 
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, connectionState: { isValid?: boolean; toNode?: unknown; fromNode?: { id: string }; fromHandle?: { id?: string | null } }) => {
+      if (connectionState?.isValid && connectionState?.toNode) return
+      const fromId = connectionState?.fromNode?.id
+      if (!fromId) return
+      const e = 'clientX' in event ? event : (event as TouchEvent).changedTouches?.[0]
+      if (!e) return
+      setDropPicker({
+        x: e.clientX,
+        y: e.clientY,
+        flow: { x: e.clientX - 280, y: e.clientY - 120 },
+        fromId,
+        handle: connectionState?.fromHandle?.id ?? null,
+      })
+    },
+    [],
+  )
+
   const onNodeDragStop = useCallback(
     (_: unknown, _n: Node, all: Node[]) => {
       // از state تازه استفاده کن تا گره تازه‌اضافه‌شده پاک نشود
@@ -276,6 +298,10 @@ export function StudioPage() {
   )
 
   const selected = project?.nodes.find((n) => n.id === selectedId)
+  const [dropPicker, setDropPicker] = useState<null | { x: number; y: number; flow: { x: number; y: number }; fromId: string; handle?: string | null }>(null)
+  const [localBase, setLocalBase] = useState(() => getLlmBaseUrl())
+  
+
 
 
   const onNodeClick = useCallback(
@@ -313,6 +339,8 @@ export function StudioPage() {
           پروژه‌ها
         </button>
         <span className="text-sm font-semibold">hadi-canvas</span>
+        <div className="mr-auto" />
+        <UserMenu />
         <div className="mr-2 flex gap-1 rounded-xl border border-slate-800 bg-slate-900 p-0.5">
           {(
             [
@@ -689,6 +717,72 @@ export function StudioPage() {
       )}
 
       {tab === 'settings' && (
+      <div className="flex-1 overflow-y-auto p-6" dir="rtl">
+        <h2 className="mb-4 text-lg font-semibold text-white">تنظیمات کامل</h2>
+
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+          <h3 className="mb-2 text-sm font-medium text-white">آدرس پایه API محلی / سفارشی</h3>
+          <p className="mb-2 text-[11px] text-slate-500">برای Ollama، LM Studio، یا هر سرور OpenAI-compatible</p>
+          <input
+            className="mb-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
+            value={localBase}
+            onChange={(e) => setLocalBase(e.target.value)}
+            placeholder="http://127.0.0.1:11434/v1"
+            dir="ltr"
+          />
+          <button
+            type="button"
+            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs text-white"
+            onClick={() => {
+              setLlmBaseUrl(localBase)
+              alert('آدرس پایه ذخیره شد')
+            }}
+          >
+            ذخیره Base URL
+          </button>
+        </div>
+        <div className="mt-6">
+          <h3 className="mb-2 text-sm font-medium text-white">همه سرویس‌دهندگان</h3>
+          <p className="mb-3 text-[11px] text-slate-500">کلیدها فقط روی این دستگاه ذخیره می‌شوند. برای OAuth از تب افزونه‌ها استفاده کنید.</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {CONNECTOR_CATALOG.map((c) => (
+              <div key={c.id} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                <div className="text-xs font-medium text-white">{c.label}</div>
+                <div className="mb-1 text-[10px] text-slate-500">{c.categoryLabel} · {c.serverUrl}</div>
+                <p className="mb-2 text-[10px] text-slate-400 line-clamp-2">{c.description}</p>
+                {c.auth === 'api_key' && (
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-[11px]"
+                      placeholder="API Key"
+                      id={`set-key-${c.id}`}
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      className="rounded-lg bg-emerald-700 px-2 py-1 text-[10px] text-white"
+                      onClick={() => {
+                        const el = document.getElementById(`set-key-${c.id}`) as HTMLInputElement | null
+                        const key = el?.value || ''
+                        const st = connectWithApiKey(c.id, key || (c.id === 'ollama' ? 'ollama' : ''))
+                        alert(st.status === 'connected' ? `${c.label} متصل` : st.message || 'خطا')
+                      }}
+                    >
+                      اتصال
+                    </button>
+                  </div>
+                )}
+                {c.auth !== 'api_key' && (
+                  <p className="text-[10px] text-amber-500/90">از تب افزونه‌ها → Connect / OAuth</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
         <div className="flex-1 p-6" dir="rtl">
           <h1 className="mb-2 text-lg text-white">تنظیمات</h1>
           <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
@@ -1093,6 +1187,7 @@ export function StudioPage() {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+              onConnectEnd={onConnectEnd as any}
                 onNodeDragStop={onNodeDragStop}
                 onNodeClick={onNodeClick}
                 nodeTypes={nodeTypes as any}
@@ -1149,6 +1244,46 @@ export function StudioPage() {
         </div>
       )}
 
+      {dropPicker && (
+        <>
+          <div className="fixed inset-0 z-[80]" onClick={() => setDropPicker(null)} />
+          <div
+            className="fixed z-[81] w-52 rounded-xl border border-slate-700 bg-slate-950 p-2 shadow-xl"
+            style={{ left: Math.min(dropPicker.x, window.innerWidth - 220), top: Math.min(dropPicker.y, window.innerHeight - 280) }}
+            dir="rtl"
+          >
+            <div className="mb-1 px-2 text-[10px] text-slate-500">چه نوع گره‌ای؟ · انصراف = ساخته نشود</div>
+            {KINDS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className="mb-0.5 w-full rounded-lg px-2 py-1.5 text-right text-xs text-slate-200 hover:bg-slate-800"
+                onClick={() => {
+                  const fromId = dropPicker.fromId
+                  const pos = dropPicker.flow
+                  const handle = dropPicker.handle
+                  setDropPicker(null)
+                  addNode(k, pos)
+                  setTimeout(() => {
+                    const nodes = useStore.getState().project?.nodes || []
+                    const created = [...nodes].reverse().find((n) => n.data.kind === k)
+                    if (created) {
+                      const err = useStore.getState().connect(fromId, created.id, handle, null)
+                      if (err) console.warn(err)
+                    }
+                  }, 30)
+                }}
+              >
+                {k}
+              </button>
+            ))}
+            <button type="button" className="mt-1 w-full rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-900" onClick={() => setDropPicker(null)}>
+              انصراف — گره‌ای ساخته نشود
+            </button>
+          </div>
+        </>
+      )}
+      <CodeLab />
       <PreflightModal
         open={preflightOpen}
         issues={issues}

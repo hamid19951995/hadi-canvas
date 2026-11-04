@@ -115,6 +115,10 @@ type State = {
   canRedo: () => boolean
   removeEdges: (ids: string[]) => void
   goProjects: () => void
+  codeLabNodeId: string | null
+  openCodeLab: (id: string) => void
+  closeCodeLab: () => void
+  runSingleNode: (id: string) => Promise<void>
 
   setNodes: (nodes: GNode[]) => void
   setEdges: (edges: GEdge[]) => void
@@ -167,6 +171,7 @@ export const useStore = create<State>((set, get) => ({
   runs: [],
   versions: [],
   focusNodeId: null,
+  codeLabNodeId: null,
   userTemplates: [],
   lastSavedAt: null,
   undoStack: [],
@@ -654,6 +659,86 @@ export const useStore = create<State>((set, get) => ({
 
 
   setFocusNodeId: (id) => set({ focusNodeId: id }),
+
+  openCodeLab: (id) => set({ codeLabNodeId: id, selectedId: id }),
+  closeCodeLab: () => set({ codeLabNodeId: null }),
+
+  runSingleNode: async (id) => {
+    const project = get().project
+    if (!project) return
+    const node = project.nodes.find((n) => n.id === id)
+    if (!node) return
+    if (node.data.status === 'running') return
+    get().updateNode(id, { status: 'running', error: undefined })
+    const resolved = resolveLlmApiKey()
+    const apiKey = resolved.key || get().apiKey
+    const incoming = project.edges
+      .filter((e) => e.target === id && e.valid)
+      .map((e) => project.nodes.find((n) => n.id === e.source)?.data.result || '')
+      .filter(Boolean)
+    const inputText = incoming.join('\n\n')
+    try {
+      const kind = node.data.kind
+      const mode = node.data.mode || (kind === 'agent' ? 'agent' : 'prompt')
+      let prompt = node.data.prompt || ''
+      if (inputText) prompt = inputText + (prompt ? '\n\n' + prompt : '')
+      if (mode === 'agent') {
+        prompt =
+          'تو یک ایجنت برنامه‌ریز هستی. هدف کاربر را به قدم‌های عملی بشکن و ریسک‌ها را بگو.\n\n' + prompt
+      }
+      if (kind === 'prompt' && mode === 'prompt') {
+        get().updateNode(id, { status: 'success', result: node.data.prompt })
+        return
+      }
+      if (kind === 'merge' || kind === 'final') {
+        get().updateNode(id, { status: 'success', result: inputText || node.data.prompt || '(خالی)' })
+        return
+      }
+      if (kind === 'memory') {
+        const key = node.data.config?.memoryKey || 'default'
+        const mem = { ...(project.settings.memory || {}) }
+        if (inputText || node.data.prompt) mem[key] = inputText || node.data.prompt
+        const next = { ...project, settings: { ...project.settings, memory: mem }, updatedAt: new Date().toISOString() }
+        const { upsertProject } = await import('../services/storage')
+        upsertProject(next)
+        set({ project: next })
+        get().updateNode(id, { status: 'success', result: mem[key] || '(خالی)' })
+        return
+      }
+      if (kind === 'code') {
+        const result = await chatComplete(
+          apiKey,
+          node.data.model,
+          'کد را در بلوک‌های markdown با نام فایل بنویس مثلا ```src/App.tsx\n...\n```\n\n' + prompt,
+        )
+        const files: { path: string; content: string }[] = []
+        const re = /```([^\n`]*)\n([\s\S]*?)```/g
+        let m: RegExpExecArray | null
+        while ((m = re.exec(result))) {
+          const header = (m[1] || '').trim()
+          const path = header.includes('/') || header.includes('.') ? header : header ? `src/${header}` : `src/file-${files.length + 1}.txt`
+          files.push({ path, content: m[2] || '' })
+        }
+        get().updateNode(id, { status: 'success', result, files: files.length ? files : undefined })
+        return
+      }
+      const result = await chatComplete(apiKey, node.data.model, prompt || 'سلام')
+      const hist = [...(node.data.chatHistory || [])]
+      if (mode === 'chat') {
+        hist.push({ role: 'user', content: node.data.prompt || '' })
+        hist.push({ role: 'assistant', content: result })
+      }
+      get().updateNode(id, {
+        status: 'success',
+        result,
+        chatHistory: mode === 'chat' ? hist : node.data.chatHistory,
+        prompt: mode === 'chat' ? '' : node.data.prompt,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      get().updateNode(id, { status: 'error', error: msg })
+    }
+  },
 
   duplicateNode: (id) => {
     const project = get().project

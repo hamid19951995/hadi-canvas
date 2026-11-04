@@ -4,10 +4,16 @@ export type ConnectorId =
   | 'gapgpt'
   | 'openai'
   | 'openrouter'
+  | 'anthropic'
+  | 'google'
+  | 'azure'
+  | 'ollama'
+  | 'deepseek'
   | 'github'
   | 'figma'
   | 'canva'
   | 'custom_mcp'
+  | 'custom_openai'
 
 export type ConnectorStatus = 'disconnected' | 'connected' | 'expired' | 'error'
 
@@ -120,7 +126,79 @@ export const CONNECTOR_CATALOG: ConnectorDef[] = [
     docsUrl: 'https://www.canva.com/developers',
     availability: 'needs_setup',
   },
+  
   {
+    id: 'anthropic',
+    label: 'Anthropic Claude',
+    category: 'models',
+    categoryLabel: 'Models',
+    description: 'Claude models with your Anthropic API key (OpenAI-compatible proxy or direct).',
+    serverUrl: 'https://api.anthropic.com/v1',
+    auth: 'api_key',
+    scopesNote: 'کلید API شخصی Anthropic.',
+    docsUrl: 'https://docs.anthropic.com',
+    availability: 'ready',
+  },
+  {
+    id: 'google',
+    label: 'Google Gemini',
+    category: 'models',
+    categoryLabel: 'Models',
+    description: 'Gemini via AI Studio or OpenAI-compatible gateway.',
+    serverUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    auth: 'api_key',
+    scopesNote: 'API Key از Google AI Studio.',
+    docsUrl: 'https://ai.google.dev',
+    availability: 'ready',
+  },
+  {
+    id: 'azure',
+    label: 'Azure OpenAI',
+    category: 'models',
+    categoryLabel: 'Models',
+    description: 'Enterprise Azure OpenAI endpoint + key.',
+    serverUrl: 'https://YOUR_RESOURCE.openai.azure.com/openai/deployments',
+    auth: 'api_key',
+    scopesNote: 'Endpoint و کلید Azure.',
+    docsUrl: 'https://learn.microsoft.com/azure/ai-services/openai/',
+    availability: 'ready',
+  },
+  {
+    id: 'ollama',
+    label: 'Ollama (Local)',
+    category: 'models',
+    categoryLabel: 'Models',
+    description: 'Local models via Ollama OpenAI-compatible API.',
+    serverUrl: 'http://127.0.0.1:11434/v1',
+    auth: 'api_key',
+    scopesNote: 'معمولاً کلید لازم نیست؛ در فیلد کلید مقدار ollama بگذارید.',
+    docsUrl: 'https://ollama.com',
+    availability: 'ready',
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    category: 'models',
+    categoryLabel: 'Models',
+    description: 'DeepSeek chat and coder models.',
+    serverUrl: 'https://api.deepseek.com/v1',
+    auth: 'api_key',
+    scopesNote: 'کلید DeepSeek.',
+    docsUrl: 'https://platform.deepseek.com',
+    availability: 'ready',
+  },
+  {
+    id: 'custom_openai',
+    label: 'Custom OpenAI-Compatible',
+    category: 'custom',
+    categoryLabel: 'Custom',
+    description: 'Any local or remote server that speaks OpenAI Chat Completions.',
+    serverUrl: 'http://127.0.0.1:8080/v1',
+    auth: 'api_key',
+    scopesNote: 'Base URL + کلید اختیاری.',
+    availability: 'ready',
+  },
+{
     id: 'custom_mcp',
     label: 'افزونه MCP سفارشی',
     category: 'custom',

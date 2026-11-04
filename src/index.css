@@ -8,5 +8,4 @@ html, body, #root {
   font-family: Vazirmatn, Tahoma, system-ui, sans-serif;
 }
 
-/* React Flow overrides */
 .react-flow__attribution { display: none !important; }

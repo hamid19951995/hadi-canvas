@@ -1,8 +1,25 @@
+/** OpenAI-compatible chat — respects per-provider base URL from localStorage */
+
+const BASE_KEY = 'hadi_llm_base_url'
+
+export function getLlmBaseUrl(): string {
+  try {
+    return localStorage.getItem(BASE_KEY) || 'https://api.gapgpt.app/v1'
+  } catch {
+    return 'https://api.gapgpt.app/v1'
+  }
+}
+
+export function setLlmBaseUrl(url: string) {
+  localStorage.setItem(BASE_KEY, url.replace(/\/$/, ''))
+}
+
 export async function chatComplete(apiKey: string, model: string, prompt: string): Promise<string> {
   if (!apiKey) {
     return `[نمونه محلی — کلید API تنظیم نشده]\n\n${prompt.slice(0, 500)}`
   }
-  const res = await fetch('https://api.gapgpt.app/v1/chat/completions', {
+  const base = getLlmBaseUrl()
+  const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

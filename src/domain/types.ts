@@ -13,6 +13,9 @@ export type NodeKind =
   | 'agent'
   | 'figma'
 
+/** حالت کار داخل گره پرامپت/متن/ایجنت */
+export type NodeWorkMode = 'prompt' | 'chat' | 'agent'
+
 export type NodeStatus = 'idle' | 'running' | 'success' | 'error' | 'blocked' | 'skipped'
 
 export interface PortDef {
@@ -23,15 +26,32 @@ export interface PortDef {
   required?: boolean
 }
 
+export interface CodeFile {
+  path: string
+  content: string
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
 export interface NodeData {
   title: string
   kind: NodeKind
   prompt: string
   model: string
+  /** چند مدل موازی روی همین گره */
+  models?: string[]
   status: NodeStatus
   error?: string
   result?: string
-  /** condition: expression hint; loop: max iterations; memory: key; agent: goal */
+  /** پرامپت | چت | ایجنت */
+  mode?: NodeWorkMode
+  /** تاریخچه چت روی گره */
+  chatHistory?: ChatMessage[]
+  /** ساختار فایل برای گره کد */
+  files?: CodeFile[]
   config?: {
     maxIterations?: number
     memoryKey?: string
@@ -45,7 +65,6 @@ export interface GNode {
   type: NodeKind
   position: { x: number; y: number }
   data: NodeData
-  /** optional visual/logical group */
   groupId?: string
   groupLabel?: string
 }
@@ -69,7 +88,6 @@ export interface ExecSettings {
   parallel: boolean
   costCap?: number
   models: ModelPick[]
-  /** graph-level memory bag */
   memory?: Record<string, string>
 }
 
@@ -109,14 +127,14 @@ export const PORTS: Record<NodeKind, PortDef[]> = {
     { id: 'b', label: 'ب', direction: 'in', dataType: 'any' },
     { id: 'out', label: 'خروجی', direction: 'out', dataType: 'bundle' },
   ],
-  final: [{ id: 'in', label: 'نتیجه', direction: 'in', dataType: 'any', required: true }],
+  final: [{ id: 'in', label: 'ورودی', direction: 'in', dataType: 'any', required: true }],
   condition: [
-    { id: 'in', label: 'ورودی', direction: 'in', dataType: 'text', required: true },
+    { id: 'in', label: 'ورودی', direction: 'in', dataType: 'text' },
     { id: 'true', label: 'درست', direction: 'out', dataType: 'text' },
     { id: 'false', label: 'نادرست', direction: 'out', dataType: 'text' },
   ],
   loop: [
-    { id: 'in', label: 'ورودی', direction: 'in', dataType: 'text', required: true },
+    { id: 'in', label: 'ورودی', direction: 'in', dataType: 'text' },
     { id: 'out', label: 'خروجی', direction: 'out', dataType: 'text' },
   ],
   memory: [
@@ -124,38 +142,39 @@ export const PORTS: Record<NodeKind, PortDef[]> = {
     { id: 'out', label: 'خواندن', direction: 'out', dataType: 'text' },
   ],
   agent: [
-    { id: 'in', label: 'هدف', direction: 'in', dataType: 'text', required: true },
-    { id: 'out', label: 'پاسخ', direction: 'out', dataType: 'text' },
+    { id: 'in', label: 'هدف', direction: 'in', dataType: 'text' },
+    { id: 'out', label: 'برنامه', direction: 'out', dataType: 'text' },
   ],
   figma: [
-    { id: 'in', label: 'کلید فایل / لینک', direction: 'in', dataType: 'text' },
-    { id: 'out', label: 'ساختار', direction: 'out', dataType: 'text' },
+    { id: 'in', label: 'لینک', direction: 'in', dataType: 'text' },
+    { id: 'out', label: 'طراحی', direction: 'out', dataType: 'bundle' },
   ],
 }
 
-export function portsOf(kind: NodeKind) {
-  return PORTS[kind]
+export function portsOf(kind: NodeKind): PortDef[] {
+  return PORTS[kind] || []
 }
 
 export function compatible(from: DataType, to: DataType): boolean {
-  if (from === 'any' || to === 'any' || from === to) return true
-  if (from === 'text' && (to === 'code' || to === 'image' || to === 'bool')) return true
-  if ((from === 'code' || from === 'image' || from === 'text') && to === 'bundle') return true
-  if (from === 'code' && to === 'text') return true
-  if (from === 'bool' && to === 'text') return true
+  if (to === 'any' || from === 'any') return true
+  if (from === to) return true
+  if (from === 'bundle') return true
+  if (to === 'text' && (from === 'code' || from === 'bool')) return true
   return false
 }
 
-export const NODE_LABELS: Record<NodeKind, string> = {
-  prompt: 'پرامپت پایه',
-  text: 'متن',
-  image: 'تصویر',
-  code: 'کد',
-  merge: 'ادغام',
-  final: 'خروجی نهایی',
-  condition: 'شرط',
-  loop: 'حلقه',
-  memory: 'حافظه',
-  agent: 'ایجنت',
-  figma: 'Figma',
-}
+export const MODEL_CATALOG: { id: string; label: string; provider: string }[] = [
+  { id: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI / GapGPT' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini', provider: 'OpenAI / GapGPT' },
+  { id: 'gpt-4.1', label: 'GPT-4.1', provider: 'OpenAI' },
+  { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', provider: 'OpenAI' },
+  { id: 'o4-mini', label: 'o4-mini', provider: 'OpenAI' },
+  { id: 'claude-sonnet-4', label: 'Claude Sonnet 4', provider: 'Anthropic' },
+  { id: 'claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+  { id: 'claude-3.5-haiku', label: 'Claude 3.5 Haiku', provider: 'Anthropic' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', provider: 'Google' },
+  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', provider: 'Google' },
+  { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', provider: 'OpenRouter / Local' },
+  { id: 'qwen2.5-coder', label: 'Qwen2.5 Coder', provider: 'Local / OpenRouter' },
+  { id: 'deepseek-chat', label: 'DeepSeek Chat', provider: 'DeepSeek' },
+]
