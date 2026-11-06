@@ -2,6 +2,8 @@ node_modules/
 dist/
 .env
 .env.local
-.vite/
-*.log
+*.db
+data/
 .DS_Store
+*.log
+coverage/

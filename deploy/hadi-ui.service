@@ -1,0 +1,15 @@
+[Unit]
+Description=Hadi Canvas UI Preview
+After=network.target hadi-broker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hadi-canvas
+EnvironmentFile=/opt/hadi-canvas/.env
+ExecStart=/usr/bin/npm run preview -- --host 127.0.0.1 --port 4173
+Restart=on-failure
+RestartSec=5
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

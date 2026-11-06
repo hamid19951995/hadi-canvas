@@ -1,0 +1,15 @@
+[Unit]
+Description=Hadi Canvas OAuth Broker
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hadi-canvas
+EnvironmentFile=/opt/hadi-canvas/.env
+ExecStart=/usr/bin/npm run oauth
+Restart=on-failure
+RestartSec=5
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
