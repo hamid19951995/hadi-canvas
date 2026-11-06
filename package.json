@@ -1,20 +1,39 @@
 {
   "name": "hadi-canvas",
   "private": true,
-  "version": "2.3.0",
+  "version": "3.7.0-prep",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm run typecheck && npm test && npm run build",
     "preview": "vite preview",
-    "oauth": "node server/oauth.mjs",
-    "typecheck": "tsc --noEmit"
+    "oauth": "node --env-file-if-exists=.env server/oauth.mjs",
+    "sandbox": "node --env-file-if-exists=.env server/sandbox.mjs",
+    "typecheck": "tsc --noEmit",
+    "backup": "node --env-file-if-exists=.env server/backupCli.mjs create",
+    "backup:verify": "node --env-file-if-exists=.env server/backupCli.mjs verify",
+    "backup:restore": "node --env-file-if-exists=.env server/backupCli.mjs restore",
+    "sandbox:worker": "node --env-file-if-exists=.env server/sandboxQueueWorker.mjs",
+    "migrate:identity": "node --env-file-if-exists=.env scripts/migrate-sqlite-to-pg.mjs --dry-run",
+    "migrate:identity:apply": "node --env-file-if-exists=.env scripts/migrate-sqlite-to-pg.mjs --apply",
+    "cutover:check": "node --env-file-if-exists=.env scripts/cutover-identity-check.mjs",
+    "cutover:identity": "node --env-file-if-exists=.env scripts/cutover-identity.mjs",
+    "reconcile:identity": "node --env-file-if-exists=.env scripts/reconcile-identity.mjs",
+    "start:prod": "bash scripts/start-production.sh",
+    "health": "node -e \"fetch(process.env.VITE_OAUTH_API||\"http://127.0.0.1:8787\"+\"/health\").then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2))).catch(e=>{console.error(e);process.exit(1)})\"",
+    "smoke": "bash scripts/smoke-local.sh",
+    "smoke:flow": "node --env-file-if-exists=.env scripts/smoke-flow.mjs",
+    "integrations:check": "node --env-file-if-exists=.env scripts/check-integrations.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.3.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "yjs": "13.6.33",
+    "postgres": "3.4.9"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -26,5 +45,8 @@
     "typescript": "^5.7.2",
     "vite": "^5.4.11"
   },
-  "description": "Graph-based AI studio: idea \u2192 typed nodes \u2192 run \u2192 deliver"
+  "engines": {
+    "node": ">=22.16"
+  },
+  "description": "Multi-tenant graph-based AI studio with PostgreSQL identity and project schema foundation"
 }
