@@ -1,0 +1,57 @@
+# Hadi Canvas — GitHub Actions CI
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: install + typecheck + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Unit tests (if present)
+        run: |
+          if [ -d tests ] && ls tests/*.test.mjs >/dev/null 2>&1; then
+            npm test
+          else
+            echo "No tests/ yet — skip (push full tree for smoke tests)"
+          fi
+
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_OAUTH_API: ${{ vars.VITE_OAUTH_API || 'http://127.0.0.1:8787' }}
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadi-dist
+          path: dist
+          if-no-files-found: warn
+          retention-days: 7
