@@ -11,11 +11,14 @@ export type ConnectorId =
   | 'deepseek'
   | 'github'
   | 'figma'
+  | 'linear'
+  | 'neon'
+  | 'supabase'
   | 'canva'
   | 'custom_mcp'
   | 'custom_openai'
 
-export type ConnectorStatus = 'disconnected' | 'connected' | 'expired' | 'error'
+export type ConnectorStatus = 'disconnected' | 'connected' | 'configured' | 'expired' | 'error'
 
 export type ConnectorCategory =
   | 'models'
@@ -65,6 +68,27 @@ export const CONNECTOR_CATALOG: ConnectorDef[] = [
     scopesNote: 'اتصال رسمی از طریق MCP / OAuth. فایل‌های طراحی قابل‌خواندن پس از Connect.',
     docsUrl: 'https://www.figma.com/developers',
     availability: 'ready',
+  },
+  {
+    id: 'linear', label: 'Linear', category: 'productivity', categoryLabel: 'Productivity',
+    description: 'اتصال به issueها، پروژه‌ها و دیدگاه‌های Linear از طریق MCP رسمی.',
+    serverUrl: 'https://mcp.linear.app/mcp', auth: 'mcp',
+    scopesNote: 'OAuth یا توکن Linear؛ مجوزهای حساب شما اعمال می‌شود.',
+    docsUrl: 'https://linear.app/docs/mcp', availability: 'ready',
+  },
+  {
+    id: 'neon', label: 'Neon', category: 'developer', categoryLabel: 'Developer',
+    description: 'اتصال MCP به پایگاه داده Neon.',
+    serverUrl: 'https://mcp.neon.tech/mcp', auth: 'mcp',
+    scopesNote: 'برای استفاده، مجوزهای حساب Neon لازم است.',
+    docsUrl: 'https://neon.tech/docs', availability: 'ready',
+  },
+  {
+    id: 'supabase', label: 'Supabase MCP', category: 'developer', categoryLabel: 'Developer',
+    description: 'اتصال به MCP مستقرشده در پروژه Supabase شما.',
+    serverUrl: 'https://{project-ref}.supabase.co/functions/v1/mcp', auth: 'mcp',
+    scopesNote: 'آدرس نیازمند شناسه پروژه است و باید MCP را در پروژه خود مستقر کرده باشید.',
+    docsUrl: 'https://supabase.com/docs/guides/ai-tools/byo-mcp', availability: 'needs_setup',
   },
   {
     id: 'github',
@@ -211,6 +235,15 @@ export const CONNECTOR_CATALOG: ConnectorDef[] = [
   },
 ]
 
+/** Empty string means "same origin" (Vite proxy in dev, reverse proxy in production). */
+function viteEnv(): Record<string, string | undefined> {
+  // import.meta.env only exists in Vite; guard so the module is also importable in Node tests.
+  const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+  return meta.env || {}
+}
+
+export const AUTH_API_BASE = (viteEnv().VITE_AUTH_API || '').replace(/\/$/, '')
+
 const STATE_KEY = 'hadi_connectors_v1'
 const KEYS_PREFIX = 'hadi_ck_'
 const MCP_URL_PREFIX = 'hadi_mcp_url_'
@@ -264,12 +297,13 @@ export function upsertState(patch: ConnectorState) {
 export function connectWithApiKey(id: ConnectorId, key: string): ConnectorState {
   const trimmed = key.trim()
   if (!trimmed) {
-    return upsertState({
+    const states = upsertState({
       id,
       status: 'error',
       message: 'کلید خالی است',
       lastCheckedAt: new Date().toISOString(),
-    })[0]
+    })
+    return states.find((state) => state.id === id) || { id, status: 'error', message: 'کلید خالی است' }
   }
   setApiKey(id, trimmed)
   const hint = '…' + trimmed.slice(-4)
@@ -283,61 +317,50 @@ export function connectWithApiKey(id: ConnectorId, key: string): ConnectorState 
   return states.find((s) => s.id === id)!
 }
 
-/** MCP-style connect: store server URL + optional token, mark connected after lightweight check */
+/** Store an allowlisted MCP provider in the authenticated workspace API. No browser-side token storage or opaque no-cors success. */
 export async function connectMcp(
   id: ConnectorId,
   serverUrl: string,
   token?: string,
 ): Promise<ConnectorState> {
   const url = serverUrl.trim().replace(/\/$/, '')
-  if (!url.startsWith('http')) {
-    const states = upsertState({
-      id,
-      status: 'error',
-      message: 'Server URL نامعتبر است',
-      lastCheckedAt: new Date().toISOString(),
-    })
-    return states.find((s) => s.id === id)!
+  const known = CONNECTOR_CATALOG.find((item) => item.id === id && item.auth === 'mcp')
+  const supabaseMatch = id === 'supabase' ? url.match(/^https:\/\/([a-z0-9]{20})\.supabase\.co\/functions\/v1\/mcp$/) : null
+  const endpointMatches = known && (url === known.serverUrl.replace(/\/$/, '') || Boolean(supabaseMatch))
+  if (!endpointMatches) {
+    const states = upsertState({ id, status: 'error', message: 'این MCP در فهرست امن سرور وجود ندارد یا آدرس آن تغییر کرده است', lastCheckedAt: new Date().toISOString() })
+    return states.find((state) => state.id === id)!
   }
-  setMcpServerUrl(id, url)
-  if (token?.trim()) setApiKey(id, token.trim())
-
-  // Lightweight reachability (may fail CORS in browser — still store connection intent)
-  let ok = true
-  let message: string | undefined
+  const api = AUTH_API_BASE
   try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 4000)
-    await fetch(url, { method: 'GET', mode: 'no-cors', signal: ctrl.signal })
-    clearTimeout(t)
-  } catch {
-    // CORS/opaque: still allow connect; real calls use server proxy when needed
-    message = 'آدرس ذخیره شد (بررسی شبکه از مرورگر محدود است)'
+    const response = await fetch(`${api}/api/mcp/connections`, {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: id, token: token?.trim() || undefined, projectRef: supabaseMatch?.[1] }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || `خطای سرور (${response.status})`)
+    const states = upsertState({
+      id, status: 'configured', hint: token?.trim() ? 'اعتبارنامه در سرور ذخیره شد' : 'نیازمند تأیید هویت ارائه‌دهنده',
+      serverUrl: url, lastCheckedAt: new Date().toISOString(),
+      message: 'تنظیمات ذخیره شد؛ دست‌دهی MCP و فهرست ابزارها هنوز بررسی نشده است.',
+    })
+    return states.find((state) => state.id === id)!
+  } catch (error) {
+    const states = upsertState({ id, status: 'error', message: error instanceof Error ? error.message : 'اتصال به API حساب ناموفق بود', lastCheckedAt: new Date().toISOString() })
+    return states.find((state) => state.id === id)!
   }
-
-  const hint = token?.trim() ? '…' + token.trim().slice(-4) : url.replace(/^https?:\/\//, '').slice(0, 24)
-  const states = upsertState({
-    id,
-    status: ok ? 'connected' : 'error',
-    hint,
-    serverUrl: url,
-    lastCheckedAt: new Date().toISOString(),
-    message,
-  })
-  return states.find((s) => s.id === id)!
 }
 
-export function disconnectConnector(id: ConnectorId) {
+export async function disconnectConnector(id: ConnectorId) {
+  const knownMcp = ['figma', 'linear', 'neon', 'supabase'].includes(id)
+  if (knownMcp) {
+    const api = AUTH_API_BASE
+    const response = await fetch(`${api}/api/mcp/connections/${id}`, { method: 'DELETE', credentials: 'include' })
+    if (!response.ok && response.status !== 404) throw new Error('قطع اتصال در سرور ناموفق بود')
+  }
   clearApiKey(id)
   localStorage.removeItem(MCP_URL_PREFIX + id)
-  return upsertState({
-    id,
-    status: 'disconnected',
-    hint: undefined,
-    message: undefined,
-    serverUrl: undefined,
-    lastCheckedAt: new Date().toISOString(),
-  })
+  return upsertState({ id, status: 'disconnected', hint: undefined, message: undefined, serverUrl: undefined, lastCheckedAt: new Date().toISOString() })
 }
 
 export function markOAuthConnected(id: ConnectorId, hint?: string) {
@@ -358,9 +381,20 @@ export function markExpired(id: ConnectorId, message?: string) {
   })
 }
 
-/** Prefer GapGPT → OpenAI → OpenRouter for LLM */
+/** Model providers in priority order. Any connected provider with a key can drive the graph. */
+export const LLM_PROVIDERS: ConnectorId[] = [
+  'gapgpt',
+  'openai',
+  'openrouter',
+  'deepseek',
+  'anthropic',
+  'google',
+  'ollama',
+  'custom_openai',
+]
+
 export function resolveLlmApiKey(): { provider: ConnectorId; key: string } | null {
-  for (const id of ['gapgpt', 'openai', 'openrouter'] as ConnectorId[]) {
+  for (const id of LLM_PROVIDERS) {
     const st = loadConnectorStates().find((s) => s.id === id)
     const key = getApiKey(id)
     if (st?.status === 'connected' && key) return { provider: id, key }
@@ -378,12 +412,19 @@ export function isUsable(id: ConnectorId): boolean {
   return st?.status === 'connected' && Boolean(getApiKey(id) || st.hint)
 }
 
-export function connectWithOAuthToken(id: ConnectorId, token: string, hint?: string): ConnectorState {
+export function connectWithOAuthToken(
+  id: ConnectorId,
+  token: string,
+  options: { hint?: string; expiresAt?: string } = {},
+): ConnectorState {
+  if (!token) throw new Error('توکن OAuth خالی است')
   setApiKey(id, token)
   const states = upsertState({
     id,
     status: 'connected',
-    hint: hint || '…' + token.slice(-4),
+    hint: options.hint || '…' + token.slice(-4),
+    expiresAt: options.expiresAt,
+    message: undefined,
     lastCheckedAt: new Date().toISOString(),
   })
   return states.find((s) => s.id === id)!

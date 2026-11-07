@@ -1,11 +1,11 @@
-import type { GEdge, GNode, NodeStatus } from '../domain/types'
+import type { CodeFile, GEdge, GNode, NodeStatus } from '../domain/types'
 
 export type ExecFn = (
   node: GNode,
   inputText: string,
   apiKey: string,
   ctx: { memory: Record<string, string>; branch?: string }
-) => Promise<{ result: string; branch?: 'true' | 'false'; memoryPatch?: Record<string, string> }>
+) => Promise<{ result: string; branch?: 'true' | 'false'; memoryPatch?: Record<string, string>; files?: CodeFile[] }>
 
 function waves(nodes: GNode[], edges: GEdge[]): string[][] {
   const ids = nodes.map((n) => n.id)
@@ -42,7 +42,7 @@ export async function runGraph(opts: {
   apiKey: string
   memory: Record<string, string>
   execute: ExecFn
-  onStatus: (id: string, status: NodeStatus, patch?: { result?: string; error?: string }) => void
+  onStatus: (id: string, status: NodeStatus, patch?: { result?: string; error?: string; files?: CodeFile[] }) => void
   onMemory: (mem: Record<string, string>) => void
   cancelled: () => boolean
 }) {
@@ -98,7 +98,7 @@ export async function runGraph(opts: {
           memory = { ...memory, ...out.memoryPatch }
           onMemory(memory)
         }
-        onStatus(id, 'success', { result: out.result })
+        onStatus(id, 'success', { result: out.result, files: out.files })
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         onStatus(id, 'error', { error: msg })

@@ -717,6 +717,7 @@ export function StudioPage() {
       )}
 
       {tab === 'settings' && (
+      <>
       <div className="flex-1 overflow-y-auto p-6" dir="rtl">
         <h2 className="mb-4 text-lg font-semibold text-white">تنظیمات کامل</h2>
 
@@ -799,18 +800,36 @@ export function StudioPage() {
               پاک کردن کش تصاویر
             </button>
           </div>
-          <label className="mb-1 block text-xs text-slate-400">کلید API (GapGPT / سازگار OpenAI)</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="sk-..."
-          />
+          <label className="mb-1 block text-xs text-slate-400">کلید API سریع (OpenAI-compatible)</label>
+          <div className="flex max-w-md flex-wrap gap-2">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              placeholder="sk-..."
+              dir="ltr"
+            />
+            <button
+              type="button"
+              className="rounded-xl bg-emerald-700 px-3 py-2 text-xs text-white"
+              onClick={() => {
+                if (!apiKey.trim()) {
+                  alert('کلید را وارد کنید')
+                  return
+                }
+                const st = connectWithApiKey('openai', apiKey)
+                alert(st.status === 'connected' ? 'کلید OpenAI ثبت و فعال شد' : st.message || 'خطا در ثبت کلید')
+              }}
+            >
+              فعال‌سازی
+            </button>
+          </div>
           <p className="mt-2 max-w-md text-xs text-slate-500">
-            بدون کلید، خروجی نمونهٔ محلی ساخته می‌شود و به سرویس بیرونی درخواست نمی‌رود.
+            کلید فقط پس از «فعال‌سازی» در رجیستری اتصال‌ها ثبت می‌شود؛ تا آن زمان خروجی نمونهٔ محلی ساخته می‌شود.
           </p>
         </div>
+      </>
       )}
 
       {tab === 'output' && (
@@ -1146,7 +1165,7 @@ export function StudioPage() {
                     })
                     .map((n) => {
                       const q = query.trim().toLowerCase()
-                      let snippet = n.data.kind
+                      let snippet: string = n.data.kind
                       if ((n.data.result || '').toLowerCase().includes(q)) {
                         const r = n.data.result || ''
                         const i = r.toLowerCase().indexOf(q)

@@ -3,7 +3,7 @@ import type { GEdge, GNode, NodeKind, NodeStatus, PreflightIssue, Project } from
 import { compatible, portsOf } from '../domain/types'
 import { preflight, canRun } from '../engine/preflight'
 import { runGraph } from '../engine/runGraph'
-import { chatComplete } from '../services/llm'
+import { executeNode } from '../engine/executeNode'
 import { resolveLlmApiKey, isUsable } from '../services/connectors'
 import { fetchFigmaFrameImages, parseFigmaFileKey } from '../services/figmaApi'
 import { buildTemplate } from '../templates/catalog'
@@ -590,33 +590,51 @@ export const useStore = create<State>((set, get) => ({
 
   retryNode: async (nodeId) => {
     const project = get().project
-    if (!project || get().running) return
+    if (!project) return
+    if (get().running) {
+      // allow a targeted retry while another node runs, but never run the same node twice
+      if (project.nodes.find((n) => n.id === nodeId)?.data.status === 'running') return
+    }
     const node = project.nodes.find((n) => n.id === nodeId)
     if (!node) return
-    set({ running: true, cancel: false })
     get().updateNode(nodeId, { status: 'running', error: undefined })
     const incoming = project.edges
       .filter((e) => e.target === nodeId && e.valid)
       .map((e) => project.nodes.find((n) => n.id === e.source)?.data.result)
       .filter(Boolean)
       .join('\n\n')
+    const resolved = resolveLlmApiKey()
     try {
-      const key = resolveLlmApiKey()?.key || get().apiKey
-      let result = ''
-      if (node.data.kind === 'prompt') result = node.data.prompt
-      else if (node.data.kind === 'merge' || node.data.kind === 'final') result = incoming || node.data.prompt || '(خالی)'
-      else {
-        const prompt = [node.data.prompt, incoming].filter(Boolean).join('\n\n')
-        result = await chatComplete(key, node.data.model, prompt)
+      const out = await executeNode({
+        node,
+        inputText: incoming,
+        apiKey: resolved?.key || get().apiKey,
+        provider: resolved?.provider,
+        memory: project.settings.memory || {},
+        cancelled: () => get().cancel,
+      })
+      if (out.memoryPatch) {
+        const proj = get().project
+        if (proj) {
+          const memory = { ...(proj.settings.memory || {}), ...out.memoryPatch }
+          const next = { ...proj, settings: { ...proj.settings, memory }, updatedAt: new Date().toISOString() }
+          upsertProject(next)
+          set({ project: next })
+        }
       }
-      get().updateNode(nodeId, { status: 'success', result })
+      get().updateNode(nodeId, {
+        status: 'success',
+        result: out.result,
+        error: undefined,
+        files: out.files,
+        chatHistory: out.chatHistory ?? node.data.chatHistory,
+        prompt: out.clearPrompt ? '' : node.data.prompt,
+      })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       get().updateNode(nodeId, { status: 'error', error: msg })
     }
-    set({ running: false })
   },
-
 
   refreshVersions: () => {
     const id = get().project?.id
@@ -671,68 +689,34 @@ export const useStore = create<State>((set, get) => ({
     if (node.data.status === 'running') return
     get().updateNode(id, { status: 'running', error: undefined })
     const resolved = resolveLlmApiKey()
-    const apiKey = resolved.key || get().apiKey
+    const apiKey = resolved?.key || get().apiKey
     const incoming = project.edges
       .filter((e) => e.target === id && e.valid)
       .map((e) => project.nodes.find((n) => n.id === e.source)?.data.result || '')
       .filter(Boolean)
-    const inputText = incoming.join('\n\n')
     try {
-      const kind = node.data.kind
-      const mode = node.data.mode || (kind === 'agent' ? 'agent' : 'prompt')
-      let prompt = node.data.prompt || ''
-      if (inputText) prompt = inputText + (prompt ? '\n\n' + prompt : '')
-      if (mode === 'agent') {
-        prompt =
-          'تو یک ایجنت برنامه‌ریز هستی. هدف کاربر را به قدم‌های عملی بشکن و ریسک‌ها را بگو.\n\n' + prompt
-      }
-      if (kind === 'prompt' && mode === 'prompt') {
-        get().updateNode(id, { status: 'success', result: node.data.prompt })
-        return
-      }
-      if (kind === 'merge' || kind === 'final') {
-        get().updateNode(id, { status: 'success', result: inputText || node.data.prompt || '(خالی)' })
-        return
-      }
-      if (kind === 'memory') {
-        const key = node.data.config?.memoryKey || 'default'
-        const mem = { ...(project.settings.memory || {}) }
-        if (inputText || node.data.prompt) mem[key] = inputText || node.data.prompt
-        const next = { ...project, settings: { ...project.settings, memory: mem }, updatedAt: new Date().toISOString() }
-        const { upsertProject } = await import('../services/storage')
+      const out = await executeNode({
+        node,
+        inputText: incoming.join('\n\n'),
+        apiKey,
+        provider: resolved?.provider,
+        memory: project.settings.memory || {},
+        cancelled: () => get().cancel,
+      })
+      let memory = project.settings.memory
+      if (out.memoryPatch) {
+        memory = { ...(memory || {}), ...out.memoryPatch }
+        const next = { ...project, settings: { ...project.settings, memory }, updatedAt: new Date().toISOString() }
         upsertProject(next)
         set({ project: next })
-        get().updateNode(id, { status: 'success', result: mem[key] || '(خالی)' })
-        return
-      }
-      if (kind === 'code') {
-        const result = await chatComplete(
-          apiKey,
-          node.data.model,
-          'کد را در بلوک‌های markdown با نام فایل بنویس مثلا ```src/App.tsx\n...\n```\n\n' + prompt,
-        )
-        const files: { path: string; content: string }[] = []
-        const re = /```([^\n`]*)\n([\s\S]*?)```/g
-        let m: RegExpExecArray | null
-        while ((m = re.exec(result))) {
-          const header = (m[1] || '').trim()
-          const path = header.includes('/') || header.includes('.') ? header : header ? `src/${header}` : `src/file-${files.length + 1}.txt`
-          files.push({ path, content: m[2] || '' })
-        }
-        get().updateNode(id, { status: 'success', result, files: files.length ? files : undefined })
-        return
-      }
-      const result = await chatComplete(apiKey, node.data.model, prompt || 'سلام')
-      const hist = [...(node.data.chatHistory || [])]
-      if (mode === 'chat') {
-        hist.push({ role: 'user', content: node.data.prompt || '' })
-        hist.push({ role: 'assistant', content: result })
       }
       get().updateNode(id, {
         status: 'success',
-        result,
-        chatHistory: mode === 'chat' ? hist : node.data.chatHistory,
-        prompt: mode === 'chat' ? '' : node.data.prompt,
+        result: out.result,
+        error: undefined,
+        files: out.files,
+        chatHistory: out.chatHistory ?? node.data.chatHistory,
+        prompt: out.clearPrompt ? '' : node.data.prompt,
       })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -772,7 +756,7 @@ export const useStore = create<State>((set, get) => ({
 
     set({ running: true, cancel: false, preflightOpen: false })
     const resolved = resolveLlmApiKey()
-    const apiKey = resolved.key || get().apiKey
+    const apiKey = resolved?.key || get().apiKey
 
     await runGraph({
       nodes: project.nodes,
@@ -782,7 +766,14 @@ export const useStore = create<State>((set, get) => ({
       memory: { ...(project.settings.memory || {}) },
       cancelled: () => get().cancel,
       onStatus: (id, status, patch) => {
-        get().updateNode(id, { status, result: patch?.result, error: patch?.error })
+        get().updateNode(id, {
+          status,
+          result: patch?.result,
+          error: patch?.error,
+          files: patch?.files,
+          // running/skipped states must not carry a stale success result
+          ...(status === 'running' || status === 'skipped' ? { error: undefined } : {}),
+        })
       },
       onMemory: (mem) => {
         const proj = get().project
@@ -792,83 +783,15 @@ export const useStore = create<State>((set, get) => ({
         set({ project: next })
       },
       execute: async (node, inputText, key, ctx) => {
-        const kind = node.data.kind
-        if (kind === 'prompt') {
-          return { result: node.data.prompt }
-        }
-        if (kind === 'merge' || kind === 'final') {
-          return { result: inputText || node.data.prompt || '(خالی)' }
-        }
-        if (kind === 'condition') {
-          const text = (inputText || node.data.prompt || '').toLowerCase()
-          const hint = (node.data.config?.conditionHint || node.data.prompt || '').toLowerCase()
-          // Simple honest rule: true if input contains yes/بله/true/1
-          const ok = /\b(yes|true|1|بله|آره|درست)\b/i.test(text) || (hint && text.includes('بله'))
-          const branch = ok ? 'true' as const : 'false' as const
-          return {
-            result: ok ? `شرط برقرار (true)\n${inputText}` : `شرط برقرار نیست (false)\n${inputText}`,
-            branch,
-          }
-        }
-        if (kind === 'loop') {
-          const max = Math.min(node.data.config?.maxIterations ?? 3, 5)
-          let acc = inputText || node.data.prompt || ''
-          for (let i = 0; i < max; i++) {
-            if (get().cancel) break
-            const step = await chatComplete(
-              key,
-              node.data.model,
-              `دور ${i + 1} از ${max}. ورودی را یک قدم بهبود بده و کوتاه برگردان:\n${acc}`
-            )
-            acc = step
-          }
-          return { result: `[حلقه ${max} دور]\n${acc}` }
-        }
-        if (kind === 'memory') {
-          const k = node.data.config?.memoryKey || 'default'
-          if (inputText.trim()) {
-            return {
-              result: inputText,
-              memoryPatch: { [k]: inputText },
-            }
-          }
-          const stored = ctx.memory[k] || '(خالی)'
-          return { result: stored }
-        }
-        if (kind === 'agent') {
-          const goal = [node.data.prompt, inputText].filter(Boolean).join('\n')
-          const text = await chatComplete(
-            key,
-            node.data.model,
-            `تو یک ایجنت برنامه‌ریز هستی. هدف:\n${goal}\n\n1) خلاصه هدف\n2) سه قدم پیشنهادی\n3) ریسک‌ها\nکوتاه و عملی بنویس.`
-          )
-          return { result: text }
-        }
-        if (kind === 'figma') {
-          if (!isUsable('figma')) {
-            throw new Error('Figma متصل نیست')
-          }
-          const raw = [node.data.config?.figmaFileKey, node.data.prompt, inputText].filter(Boolean).join('\n')
-          const key = parseFigmaFileKey(raw) || parseFigmaFileKey(inputText || '') || parseFigmaFileKey(node.data.prompt || '')
-          if (!key) {
-            throw new Error('کلید فایل Figma یا لینک design/file را در پرامپت بگذارید')
-          }
-          // optional: node ids comma-separated in prompt line "nodes: 1:2,1:3"
-          const nodeMatch = raw.match(/nodes?:\s*([0-9: ,-]+)/i)
-          const nodeIds = nodeMatch
-            ? nodeMatch[1].split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)
-            : undefined
-          const { summary } = await fetchFigmaFrameImages(key, { nodeIds, limit: 6, scale: 1 })
-          return { result: summary }
-        }
-        if (kind === 'image') {
-          const prompt = [node.data.prompt, inputText].filter(Boolean).join('\n')
-          const text = await chatComplete(key, node.data.model, `شرح تصویر بساز:\n${prompt}`)
-          return { result: text }
-        }
-        const prompt = [node.data.prompt, inputText].filter(Boolean).join('\n\n')
-        const text = await chatComplete(key, node.data.model, prompt)
-        return { result: text }
+        const out = await executeNode({
+          node,
+          inputText,
+          apiKey: key,
+          provider: resolved?.provider,
+          memory: ctx.memory,
+          cancelled: () => get().cancel,
+        })
+        return { result: out.result, branch: out.branch, memoryPatch: out.memoryPatch, files: out.files }
       },
     })
 

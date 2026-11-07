@@ -21,7 +21,11 @@ export function OAuthCallbackPage() {
       setMsg('code در URL نیست.')
       return
     }
-    if (expected && state && expected !== state) {
+    if (!expected) {
+      setMsg('جریان OAuth در این مرورگر شروع نشده بود؛ state قابل بررسی نیست. دوباره از داخل برنامه Connect کنید.')
+      return
+    }
+    if (expected !== state) {
       setMsg('state نامعتبر است. دوباره تلاش کنید.')
       return
     }
@@ -32,14 +36,14 @@ export function OAuthCallbackPage() {
         const exp = tok.expires_in
           ? new Date(Date.now() + tok.expires_in * 1000).toISOString()
           : undefined
-        connectWithOAuthToken('canva', tok.access_token, exp)
+        connectWithOAuthToken('canva', tok.access_token, { expiresAt: exp })
         setMsg('Canva متصل شد. در حال بازگشت…')
       } else if (provider === 'figma') {
         const tok = await exchangeFigmaCode(code)
         const exp = tok.expires_in
           ? new Date(Date.now() + tok.expires_in * 1000).toISOString()
           : undefined
-        connectWithOAuthToken('figma', tok.access_token, exp)
+        connectWithOAuthToken('figma', tok.access_token, { expiresAt: exp })
         setMsg('Figma متصل شد. در حال بازگشت…')
       } else {
         const token = await exchangeGithubCode(code)

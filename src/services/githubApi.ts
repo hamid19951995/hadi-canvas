@@ -45,7 +45,9 @@ export async function fetchGithubUser(): Promise<GhUser> {
 export async function validateGithubConnection(): Promise<GhUser> {
   const user = await fetchGithubUser()
   const existing = loadConnectorStates().find((s) => s.id === 'github')
-  connectWithOAuthToken('github', getStoredKey('github'), existing?.expiresAt)
+  const token = getStoredKey('github')
+  if (!token) throw new Error('توکن GitHub ذخیره نشده است.')
+  connectWithOAuthToken('github', token, { expiresAt: existing?.expiresAt })
   return user
 }
 

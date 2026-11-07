@@ -110,14 +110,16 @@ export function preflight(nodes: GNode[], edges: GEdge[], settings: ExecSettings
 
   const needsLlm = nodes.some((n) => ['text', 'code', 'image'].includes(n.data.kind))
   if (needsLlm) {
-    const { key, provider } = resolveLlmApiKey()
+    const resolved = resolveLlmApiKey()
+    const key = resolved?.key
+    const provider = resolved?.provider
     if (!key) {
       issues.push({
         level: 'warning',
         message: 'هیچ اتصال LLM معتبری نیست؛ خروجی نمونهٔ محلی ساخته می‌شود.',
         fix: 'از افزونه‌ها GapGPT/OpenAI را با کلید خود وصل کنید.',
       })
-    } else if (provider && provider !== 'legacy') {
+    } else if (provider) {
       const st = loadConnectorStates().find((s) => s.id === provider)
       if (st?.status === 'expired') {
         issues.push({

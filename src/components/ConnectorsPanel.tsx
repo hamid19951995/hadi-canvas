@@ -3,6 +3,7 @@ import {
   CONNECTOR_CATALOG,
   connectMcp,
   connectWithApiKey,
+  connectWithOAuthToken,
   disconnectConnector,
   getMcpServerUrl,
   loadConnectorStates,
@@ -17,6 +18,7 @@ import {
 } from '../services/githubOAuth'
 import { validateGithubConnection } from '../services/githubApi'
 import { isFigmaOAuthConfigured, startFigmaOAuth } from '../services/figmaOAuth'
+import { validateFigmaConnection } from '../services/figmaApi'
 import { isCanvaOAuthConfigured, startCanvaOAuth } from '../services/canvaOAuth'
 
 const categoryOrder = ['productivity', 'models', 'developer', 'design', 'custom'] as const
@@ -71,6 +73,7 @@ export function ConnectorsPanel() {
   const statusLabel = (s?: ConnectorState) => {
     if (!s) return 'قطع'
     if (s.status === 'connected') return 'متصل'
+    if (s.status === 'configured') return 'تنظیم‌شده؛ تأییدنشده'
     if (s.status === 'expired') return 'منقضی'
     if (s.status === 'error') return 'خطا'
     return 'قطع'
@@ -78,6 +81,7 @@ export function ConnectorsPanel() {
 
   const statusClass = (s?: ConnectorState) => {
     if (s?.status === 'connected') return 'bg-emerald-500/15 text-emerald-400'
+    if (s?.status === 'configured') return 'bg-amber-500/15 text-amber-300'
     if (s?.status === 'expired') return 'bg-amber-500/15 text-amber-400'
     if (s?.status === 'error') return 'bg-red-500/15 text-red-400'
     return 'bg-slate-800 text-slate-400'
@@ -96,27 +100,36 @@ export function ConnectorsPanel() {
         return
       }
       if (c.id === 'github') {
-        const ok = isGithubOAuthConfigured() && (await checkOAuthServer())
-        if (!ok) {
-          setMsg('سرور OAuth یا Client ID تنظیم نشده (npm run oauth + .env)')
+        const health = isGithubOAuthConfigured() ? await checkOAuthServer() : { ok: false, error: 'VITE_GITHUB_CLIENT_ID تنظیم نشده' }
+        if (!health.ok || health.githubConfigured === false) {
+          setMsg(health.error || 'سرور OAuth یا Client ID تنظیم نشده (npm run oauth + .env)')
           return
         }
-        startGithubOAuth()
+        const started = await startGithubOAuth()
+        window.location.assign(started.authorizeUrl)
         return
       }
       if (c.id === 'figma' && c.auth === 'mcp') {
-        // Prefer MCP URL connect; if OAuth configured, offer both via token field optional
         const url = serverUrls[c.id] || c.serverUrl
-        const token = keys[c.id]
-        if (isFigmaOAuthConfigured() && !token) {
-          startFigmaOAuth()
+        const token = keys[c.id]?.trim()
+        if (token) {
+          // A Figma personal access token (read-only) authorizes the REST calls used by figma nodes.
+          connectWithOAuthToken('figma', token)
+          await validateFigmaConnection().catch(() => null)
+          refresh()
+          setMsg('توکن Figma ذخیره شد؛ گره‌های Figma اکنون فعال هستند (در صورت نامعتبر بودن، هنگام اجرا خطا می‌گیرید).')
           return
         }
-        const next = await connectMcp(c.id, url, token)
+        if (isFigmaOAuthConfigured()) {
+          const started = await startFigmaOAuth()
+          window.location.assign(started.authorizeUrl)
+          return
+        }
+        const next = await connectMcp(c.id, url)
         refresh()
         setMsg(
-          next.status === 'connected'
-            ? `Figma به ${url} متصل شد.`
+          next.status === 'configured'
+            ? `تنظیمات MCP در ${url} ذخیره شد. برای فعال‌شدن گره‌های Figma یک Personal Access Token هم وارد کنید.`
             : next.message || 'خطا در اتصال',
         )
         return
@@ -126,7 +139,8 @@ export function ConnectorsPanel() {
           setMsg('CANVA_CLIENT_ID در .env تنظیم نشده')
           return
         }
-        await startCanvaOAuth()
+        const started = await startCanvaOAuth()
+        window.location.assign(started.authorizeUrl)
         return
       }
       if (c.auth === 'mcp') {
@@ -141,9 +155,10 @@ export function ConnectorsPanel() {
   }
 
   const onDisconnect = () => {
-    disconnectConnector(selected.id)
-    refresh()
-    setMsg(`${selected.label} قطع شد.`)
+    void (async () => {
+      try { await disconnectConnector(selected.id); refresh(); setMsg(`${selected.label} قطع شد.`) }
+      catch (error) { setMsg(error instanceof Error ? error.message : 'قطع اتصال ناموفق بود') }
+    })()
   }
 
   return (
@@ -209,7 +224,7 @@ export function ConnectorsPanel() {
                 <div className="text-xs text-slate-500">{selected.categoryLabel}</div>
               </div>
             </div>
-            {st?.status === 'connected' ? (
+            {st?.status === 'connected' || st?.status === 'configured' ? (
               <button
                 type="button"
                 onClick={onDisconnect}
@@ -243,12 +258,12 @@ export function ConnectorsPanel() {
           {(selected.auth === 'api_key' || selected.auth === 'mcp') && (
             <>
               <div className="mb-1 text-xs font-medium text-slate-500">
-                {selected.auth === 'mcp' ? 'Token (اختیاری)' : 'API Key'}
+                {selected.id === 'figma' ? 'Figma Personal Access Token' : selected.auth === 'mcp' ? 'Token (اختیاری)' : 'API Key'}
               </div>
               <input
                 type="password"
                 className="mb-4 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200"
-                placeholder={selected.auth === 'mcp' ? 'در صورت نیاز' : 'کلید API'}
+                placeholder={selected.id === 'figma' ? 'figd_… (از تنظیمات Figma)' : selected.auth === 'mcp' ? 'در صورت نیاز' : 'کلید API'}
                 value={keys[selected.id] || ''}
                 onChange={(e) => setKeys((k) => ({ ...k, [selected.id]: e.target.value }))}
               />
@@ -267,17 +282,16 @@ export function ConnectorsPanel() {
             </a>
           )}
 
-          {st?.status === 'connected' && (
+          {(st?.status === 'connected' || st?.status === 'configured') && (
             <div className="mt-4 rounded-xl border border-emerald-900/50 bg-emerald-950/30 px-3 py-2 text-[11px] text-emerald-300">
-              متصل{st.hint ? ` · ${st.hint}` : ''}
+              {st.status === 'configured' ? 'تنظیم‌شده (اتصال زنده هنوز تأیید نشده)' : 'متصل'}{st.hint ? ` · ${st.hint}` : ''}
               {st.serverUrl ? ` · ${st.serverUrl}` : ''}
             </div>
           )}
           {msg && <p className="mt-3 text-xs text-violet-300">{msg}</p>}
 
           <p className="mt-5 text-[10px] leading-relaxed text-slate-600">
-            Third-party connectors are not built or maintained by hadi-canvas host. Review permissions before
-            connecting. API keys stay in your browser unless you use the local OAuth helper.
+            Third-party connectors are not built or maintained by Hadi Canvas. Review permissions before connecting. MCP credentials are sent to the authenticated server API and encrypted at rest; a configured entry is not proof of a live MCP session.
           </p>
         </div>
       </div>

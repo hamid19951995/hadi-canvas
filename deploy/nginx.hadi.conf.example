@@ -1,5 +1,5 @@
 # Hadi Canvas — Nginx TLS reverse proxy example
-# See docs/DEPLOY_VPS.md
+# See docs/DEPLOY.md
 
 server {
     listen 443 ssl http2;
@@ -17,15 +17,29 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Account + MCP API (session cookie stays same-origin)
     location /api/ {
-        proxy_pass http://127.0.0.1:8787/;
+        proxy_pass http://127.0.0.1:8788;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Connection '';
-        proxy_buffering off;
-        proxy_read_timeout 3600s;
+        proxy_set_header Origin $http_origin;
+    }
+
+    # OAuth broker (GitHub/Figma/Canva token exchange)
+    location /oauth/ {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /health {
+        proxy_pass http://127.0.0.1:8788/health;
+        proxy_set_header Host $host;
     }
 }

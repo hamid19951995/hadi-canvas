@@ -4,6 +4,7 @@ import { cacheKey, setCached, warmCache } from './imageCache'
 async function figmaFetch<T>(path: string): Promise<T> {
   if (!isUsable('figma')) throw new Error('Figma متصل نیست. از افزونه‌ها OAuth کنید.')
   const token = getStoredKey('figma')
+  if (!token) throw new Error('توکن Figma ذخیره نشده است. دوباره وصل شوید.')
   const res = await fetch(`https://api.figma.com/v1${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -21,7 +22,9 @@ export async function fetchFigmaMe(): Promise<{ id: string; email?: string; hand
 
 export async function validateFigmaConnection() {
   const me = await fetchFigmaMe()
-  connectWithOAuthToken('figma', getStoredKey('figma'))
+  const token = getStoredKey('figma')
+  if (!token) throw new Error('توکن Figma ذخیره نشده است.')
+  connectWithOAuthToken('figma', token)
   return me
 }
 
